@@ -254,83 +254,127 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Check if jsPDF is loaded
-        if (typeof jsPDF === 'undefined') {
-            console.error('jsPDF is not loaded yet.');
-            alert('Failed to generate PDF. Please try again.');
-            return;
-        }
+        // Check if PDFMake is loaded
+    if (typeof pdfMake === 'undefined') {
+        console.error('PDFMake is not loaded yet.');
+        alert('Failed to generate PDF. Please try again.');
+        return;
+    }
 
-        // Generate PDF
-        const pdf = new jsPDF();
-        pdf.text('Invoice', 10, 10);
-        pdf.text(`Invoice Number: ${document.getElementById('invoiceNumber').textContent}`, 10, 20);
-        pdf.text(`Client: ${toAddress.textContent}`, 10, 30);
-        let y = 40;
-        items.forEach(item => {
-            pdf.text(`${item.description} - Quantity: ${item.quantity}, Rate: INR ${item.rate.toFixed(2)}, Amount: INR ${item.amount.toFixed(2)}`, 10, y);
-            y += 10;
+    // Define the document structure for PDFMake
+    const docDefinition = {
+        content: [
+            { text: 'Invoice', style: 'header' },
+            { text: `Invoice Number: ${document.getElementById('invoiceNumber').textContent}` },
+            { text: `Client: ${toAddress.textContent}`, style: 'subheader' },
+            '\n',
+            // Items Table
+            {
+                table: {
+                    headerRows: 1,
+                    widths: ['*', 'auto', 'auto', 'auto'],
+                    body: [
+                        ['Description', 'Quantity', 'Rate', 'Amount'],
+                        ...items.map(item => [item.description, item.quantity, `INR ${item.rate.toFixed(2)}`, `INR ${item.amount.toFixed(2)}`])
+                    ]
+                }
+            },
+            '\n',
+            { text: `Sub Total: ${subTotal.textContent}`, style: 'totals' },
+            { text: `CGST: ${cgst.textContent}`, style: 'totals' },
+            { text: `SGST: ${sgst.textContent}`, style: 'totals' },
+            { text: `Total: ${total.textContent}`, style: 'totals' }
+        ],
+        styles: {
+            header: {
+                fontSize: 18,
+                bold: true,
+                margin: [0, 0, 0, 10]
+            },
+            subheader: {
+                fontSize: 14,
+                bold: true,
+                margin: [0, 10, 0, 5]
+            },
+            totals: {
+                fontSize: 12,
+                bold: true,
+                margin: [0, 5, 0, 5]
+            },
+            tableHeader: {
+                bold: true,
+                fontSize: 13,
+                color: 'black'
+            }
+        },
+        defaultStyle: {
+            // Default style for all text elements
+            fontSize: 12
+        }
+    };
+
+    // Generate PDF
+    try {
+        const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+        pdfDocGenerator.getBlob(async (blob) => {
+            // Upload PDF to Supabase Storage
+            const fileName = `${document.getElementById('invoiceNumber').textContent}.pdf`;
+            const { data: uploadData, error: uploadError } = await supabase
+                .storage
+                .from('invoices')
+                .upload(fileName, blob);
+
+            if (uploadError) {
+                console.error('Error uploading PDF:', uploadError);
+                alert('Failed to upload the invoice PDF. Please try again.');
+                return;
+            }
+
+            // Get the URL for the uploaded file
+            const { data: urlData, error: urlError } = await supabase
+                .storage
+                .from('invoices')
+                .getPublicUrl(fileName);
+
+            if (urlError) {
+                console.error('Error getting PDF URL:', urlError);
+                alert('Failed to get PDF URL. Please try again.');
+                return;
+            }
+
+            // Insert invoice data including PDF URL
+            // After generating and uploading the PDF, when inserting the invoice data
+const { data, error } = await supabase
+.from('invoices')
+.insert([{
+    client_id: selectedClientId,
+    invoice_number: document.getElementById('invoiceNumber').textContent,
+    invoice_date: date,
+    due_date: dueDate,
+    items: items,
+    sub_total: parseFloat(subTotal.textContent.replace('INR ', '')),
+    cgst: 180.00,
+    sgst: 180.00,
+    tax_total: 360.00,
+    total: parseFloat(total.textContent.replace('INR ', '')),
+    balance: parseFloat(balance.textContent.replace('INR ', '')),
+    pdf_url: urlData.publicUrl // This line should now work since pdf_url exists
+}]);
+
+if (error) {
+console.error('Error adding invoice:', error);
+alert('An error occurred while adding the invoice. Error details: ' + error.message);
+} else {
+console.log('Invoice added successfully:', data);
+$('#addInvoiceModal').modal('hide');
+fetchInvoicesForClient(selectedClientId); // Refresh invoices list after adding new one
+}
         });
-        pdf.text(`Sub Total: INR ${subTotal.textContent.split(' ')[1]}`, 10, y + 10);
-        pdf.text(`CGST: INR ${cgst.textContent.split(' ')[1]}`, 10, y + 20);
-        pdf.text(`SGST: INR ${sgst.textContent.split(' ')[1]}`, 10, y + 30);
-        pdf.text(`Total: INR ${total.textContent.split(' ')[1]}`, 10, y + 40);
-
-        // Convert PDF to Blob
-        const pdfBlob = pdf.output('blob');
-
-        // Upload PDF to Supabase Storage
-        const fileName = `${document.getElementById('invoiceNumber').textContent}.pdf`;
-        const { data: uploadData, error: uploadError } = await supabase
-            .storage
-            .from('invoices') // Assuming you have a bucket named 'invoices'
-            .upload(fileName, pdfBlob);
-
-        if (uploadError) {
-            console.error('Error uploading PDF:', uploadError);
-            alert('Failed to upload the invoice PDF. Please try again.');
-            return;
-        }
-
-        // Get the URL for the uploaded file
-        const { data: urlData, error: urlError } = await supabase
-            .storage
-            .from('invoices')
-            .getPublicUrl(fileName);
-
-        if (urlError) {
-            console.error('Error getting PDF URL:', urlError);
-            alert('Failed to get PDF URL. Please try again.');
-            return;
-        }
-
-        // Insert invoice data including PDF URL
-        const { data, error } = await supabase
-            .from('invoices')
-            .insert([{
-                client_id: selectedClientId,
-                invoice_number: document.getElementById('invoiceNumber').textContent,
-                invoice_date: date,
-                due_date: dueDate,
-                items: items,
-                sub_total: parseFloat(subTotal.textContent.replace('INR ', '')),
-                cgst: 180.00,
-                sgst: 180.00,
-                tax_total: 360.00,
-                total: parseFloat(total.textContent.replace('INR ', '')),
-                balance: parseFloat(balance.textContent.replace('INR ', '')),
-                pdf_url: urlData.publicUrl
-            }]);
-
-        if (error) {
-            console.error('Error adding invoice:', error);
-            alert('An error occurred while adding the invoice. Error details: ' + error.message);
-        } else {
-            console.log('Invoice added successfully:', data);
-            $('#addInvoiceModal').modal('hide');
-            fetchInvoicesForClient(selectedClientId); // Refresh invoices list after adding new one
-        }
-    });
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('An error occurred while generating the PDF: ' + error.message);
+    }
+});
 
     // Initial fetch of clients
     fetchClients();
