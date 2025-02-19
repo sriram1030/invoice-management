@@ -1,0 +1,140 @@
+body {
+    background-color: rgb(238, 243, 247) !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-weight: 500;
+    padding: 20px;
+}
+
+/* Common Box Styling */
+.box {
+    background-color: rgb(241, 248, 255);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Specific Column Styling */
+#col-1 {
+    background-color: rgb(241, 248, 255);;
+    display: flex;
+    align-items: center;
+}
+
+#col-2{
+    align-items: center;
+    justify-content: space-between;
+}
+
+#col-3 {
+    min-height: 100vh;
+}
+
+#col-4 {
+    background-color: rgb(241, 248, 255);;
+    min-height: 100vh;
+    color: #000;
+}
+
+/* General Modal Styling */
+.modal-xl {
+    max-width: 1000px !important;
+}
+
+#addInvoiceModal .modal-body {
+    padding: 2rem;
+}
+
+#addInvoiceModal .modal-content {
+    width: 100%;
+    height: 100%;
+}
+
+/* Styling for From and To Addresses */
+#addInvoiceModal .modal-body p {
+    margin-bottom: 0;
+}
+
+#toAddress {
+    font-weight: bold;
+    border: 1px solid #ced4da;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+/* Styling for Invoice Details */
+#invoiceNumber, #date, #dueDate {
+    font-weight: bold;
+}
+
+/* Items Table Styling */
+#itemsTable {
+    margin-bottom: 0;
+}
+
+#itemsTable th, #itemsTable td {
+    vertical-align: middle;
+}
+
+#itemsTable input.form-control {
+    width: 100%;
+}
+
+/* Add Item Button */
+#addItemBtn {
+    margin-top: 10px;
+}
+
+/* Totals Section Styling */
+#addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
+    margin-bottom: 5px;
+}
+
+/* Highlighting Balance */
+#balance {
+    font-size: 1.2em;
+    color: red;
+    font-weight: bold;
+}
+
+/* Bank Details Styling */
+#addInvoiceModal .modal-body p strong {
+    display: block;
+}
+
+/* Submit Button Styling */
+#addInvoiceModal .modal-body .btn-primary {
+    width: 200px;
+    margin-top: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .modal-xl {
+        max-width: 90% !important;
+    }
+    
+    #addInvoiceModal .modal-body {
+        padding: 1rem;
+    }
+    
+    .modal-header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+    }
+    
+    #itemsTable th, #itemsTable td {
+        font-size: 0.9em;
+    }
+    
+    #addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
+        font-size: 0.9em;
+    }
+}
+
+.status-select {
+    width: 100%;
+}
