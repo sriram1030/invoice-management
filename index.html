@@ -3,56 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Management System</title>
+    <title>Grafikos Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@100..1000&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img src="logo.png" alt="Grafikos Logo" class="logo">
+        </div>
+        <nav class="sidebar-nav">
+            <ul class="nav-list">
+                <li class="nav-item active" data-section="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</li>
+                <li class="nav-item" data-section="invoices"><i class="bi bi-file-text"></i> Invoices</li>
+            </ul>
+        </nav>
+    </aside>
 
-    <!-- First Section -->
-<div class="container-fluid p-3">
-    <div class="row">
-        <div class="col-md-3 p-3 box me-4" id="col-1">  
-            <h1 style="font-size: 28px;">Grafikos Invoice Management System</h1>
-        </div>
-        <div class="col-md-8 p-3 box d-flex" id="col-2">  
-            <h1 id="totalClients">Total Clients - 0</h1>
-            <h1 id="totalInvoices">Total Invoices - 0</h1>
-        </div>
-    </div>
-</div>
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="header-left">
+                <h1>Hello, User</h1>
+            </div>
+            <div class="header-right">
+                <input type="text" class="search-input" placeholder="Search...">
+                <button class="notification-btn"><i class="bi bi-bell"></i></button>
+            </div>
+        </header>
 
-   <!-- Second Section: Clients and Invoices -->
-<div class="container-fluid p-3">
-    <div class="row">
-        <div class="col-md-3 box me-4" id="col-3">  
-            <button class="btn btn-primary mt-3 mb-3" id="addClientBtn" data-bs-toggle="modal" data-bs-target="#addClientModal" aria-label="Add a new client">Add a Client</button>
-            <ul class="list-group clients-list" id="clientsList"></ul>
-        </div>
-        <div class="col-md-8 box" id="col-4">  
-            <h2>Invoices</h2>
-            <button class="btn btn-success mb-3 me-2" id="addInvoiceBtn" data-bs-toggle="modal" data-bs-target="#addInvoiceModal">Add Invoice</button>
-            <button class="btn btn-secondary mb-3" id="showAllInvoicesBtn">Show All Invoices</button>
-            <table class="table table-striped table-hover" id="invoicesTable">
-                <thead>
-                    <tr>
-                        <th scope="col">Invoice No.</th> <!-- Changed from "ID" -->
-                        <th scope="col">Client</th>
-                        <th scope="col">Invoice Date</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="invoicesTableBody">
-                    <!-- Invoices will be populated here -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+        <!-- Dashboard Section (Default View) -->
+        <section class="dashboard-section">
+            <div class="dashboard-cards">
+                <div class="card income-card">Income: ₹0.00</div>
+            </div>
+            <div class="clients-section">
+                <div class="clients-header">
+                    <h2>Clients</h2>
+                    <button class="btn btn-primary add-client-btn" data-bs-toggle="modal" data-bs-target="#addClientModal">Add Client</button>
+                </div>
+                <div class="clients-grid" id="clientsGrid"></div>
+            </div>
+            <div class="recent-invoices" id="recentInvoices">
+                <h3>Recent Invoices</h3>
+                <table class="table table-striped" id="recentInvoicesTable">
+                    <thead>
+                        <tr>
+                            <th>Invoice ID</th>
+                            <th>Client Name</th>
+                            <th>Invoice Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentInvoicesBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Invoices Section (Hidden by default) -->
+        <section class="invoices-section" style="display: none;">
+            <div class="invoices-grid" id="invoicesGrid"></div>
+        </section>
+    </main>
 
     <!-- Modal for Adding Client -->
     <div class="modal fade" id="addClientModal" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
@@ -92,7 +111,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addInvoiceModal">
+                    <form id="addInvoiceForm">
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong>From:</strong><br>
@@ -104,16 +123,16 @@
                                 GSTIN: 33AGXPV873G2ZB</p>
                             </div>
                             <div class="col-md-6 text-end">
-                                <p><strong>Invoice No.:</strong> <span id="invoiceNumber">Auto Generated</span></p>
-                                <p><strong>Date:</strong> <input type="date" id="date" required></p>
-                                <p><strong>Invoice Due:</strong> <input type="date" id="dueDate" required></p>
+                                <p><strong id="invoiceNumber">Invoice No.: Auto Generated</strong></p>
+                                <p><strong>Date:</strong> <input type="date" id="date" required style="display: inline; margin-left: 5px;"></p>
+                                <p><strong>Invoice Due:</strong> <input type="date" id="dueDate" required style="display: inline; margin-left: 5px;"></p>
                             </div>
                         </div>
                         <div class="row mt-3">
                             <div class="col-md-12">
                                 <div class="mb-3">
                                     <label for="toAddress" class="form-label">To:</label>
-                                    <p id="toAddress"></p>
+                                    <div id="toAddress"></div>
                                 </div>
                             </div>
                         </div>
@@ -133,9 +152,9 @@
                                         </thead>
                                         <tbody>
                                             <tr id="itemRowTemplate" style="display: none;">
-                                                <td><input type="text" class="form-control item-description" ></td>
-                                                <td><input type="number" class="form-control item-quantity" ></td>
-                                                <td><input type="number" step="0.01" class="form-control item-rate" ></td>
+                                                <td><input type="text" class="form-control item-description"></td>
+                                                <td><input type="number" class="form-control item-quantity"></td>
+                                                <td><input type="number" step="0.01" class="form-control item-rate"></td>
                                                 <td><span class="item-amount">INR 0.00</span></td>
                                                 <td><button type="button" class="btn btn-danger remove-item">Remove</button></td>
                                             </tr>
@@ -146,13 +165,8 @@
                             </div>
                         </div>
                         <div class="row mt-3">
-                            <div class="col-md-6 offset-md-6 text-end">
-                                <p><strong>Sub Total:</strong> <span id="subTotal">INR 0.00</span></p>
-                                <p><strong>CGST (9%):</strong> <span id="cgst">INR 180.00</span></p>
-                                <p><strong>SGST (9%):</strong> <span id="sgst">INR 180.00</span></p>
-                                <p><strong>Tax Total:</strong> <span id="taxTotal">INR 360.00</span></p>
-                                <p><strong>Total:</strong> <span id="total">INR 0.00</span></p>
-                                <p><strong>Balance:</strong> <span id="balance">INR 0.00</span></p>
+                            <div class="col-md-12">
+                                <div class="totals-container" id="totalsContainer"></div>
                             </div>
                         </div>
                         <div class="row mt-3">
@@ -177,103 +191,10 @@
         </div>
     </div>
 
-    <!-- Modal for Editing Invoice -->
-    <div class="modal fade" id="editInvoiceModal" tabindex="-1" aria-labelledby="editInvoiceModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editInvoiceModalLabel">Edit Invoice</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editInvoiceForm">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>From:</strong><br>
-                                Grafikos<br>
-                                Basement Plot 27, Srinivasa Nagar<br>
-                                OMR Kottivakkam<br>
-                                Chennai, Tamilnadu, 600041<br>
-                                India<br>
-                                GSTIN: 33AGXPV873G2ZB</p>
-                            </div>
-                            <div class="col-md-6 text-end">
-                                <p><strong>Invoice No.:</strong> <span id="editInvoiceNumber"></span></p>
-                                <p><strong>Date:</strong> <input type="date" id="editDate" class="form-control" required></p>
-                                <p><strong>Invoice Due:</strong> <input type="date" id="editDueDate" class="form-control" required></p>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    <label for="editToAddress" class="form-label">To:</label>
-                                    <p id="editToAddress"></p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    <label for="editItemsTable" class="form-label">Items</label>
-                                    <table class="table table-bordered" id="editItemsTable">
-                                        <thead>
-                                            <tr>
-                                                <th>Description</th>
-                                                <th>Quantity</th>
-                                                <th>Rate</th>
-                                                <th>Amount</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr id="editItemRowTemplate" style="display: none;">
-                                                <td><input type="text" class="form-control item-description" ></td>
-                                                <td><input type="number" class="form-control item-quantity" ></td>
-                                                <td><input type="number" step="0.01" class="form-control item-rate" ></td>
-                                                <td><span class="item-amount">INR 0.00</span></td>
-                                                <td><button type="button" class="btn btn-danger remove-item">Remove</button></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                    <button type="button" class="btn btn-primary mb-3" id="editAddItemBtn">Add Item</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-6 offset-md-6 text-end">
-                                <p><strong>Sub Total:</strong> <span id="editSubTotal">INR 0.00</span></p>
-                                <p><strong>CGST (9%):</strong> <span id="editCgst">INR 180.00</span></p>
-                                <p><strong>SGST (9%):</strong> <span id="editSgst">INR 180.00</span></p>
-                                <p><strong>Tax Total:</strong> <span id="editTaxTotal">INR 360.00</span></p>
-                                <p><strong>Total:</strong> <span id="editTotal">INR 0.00</span></p>
-                                <p><strong>Balance:</strong> <span id="editBalance">INR 0.00</span></p>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col">
-                                <p><strong>BANK DETAILS:</strong><br>
-                                GRAFIKOS<br>
-                                A/C No. 158500202082424,<br>
-                                Tamilnad Mercantile Bank Ltd,<br>
-                                Chennai-Thiruvanmiyur Branch,<br>
-                                IFSC Code: TMBL0000158,<br>
-                                MICR Code: 600060010.</p>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col text-center">
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
     <script type="module" src="script.js"></script>

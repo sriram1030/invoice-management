@@ -1,407 +1,401 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-// Initialize Supabase client
 const supabaseUrl = 'https://zpjrivjogqljxnodmtbj.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwanJpdmpvZ3Fsanhub2RtdGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4NzgxNDUsImV4cCI6MjA1NTQ1NDE0NX0.FQ_ru6GJAOBvjJVTw6qr0RdntCDHh8KmUAUfCxxGROA';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 document.addEventListener('DOMContentLoaded', () => {
-    const addClientBtn = document.getElementById('addClientBtn');
-    const clientsList = document.getElementById('clientsList');
-    const invoicesTableBody = document.getElementById('invoicesTableBody');
-    const addInvoiceBtn = document.getElementById('addInvoiceBtn');
-    const showAllInvoicesBtn = document.getElementById('showAllInvoicesBtn');
+    const dashboardSection = document.querySelector('.dashboard-section');
+    const invoicesSection = document.querySelector('.invoices-section');
+    const clientsGrid = document.getElementById('clientsGrid');
+    const invoicesGrid = document.getElementById('invoicesGrid');
+    const recentInvoicesBody = document.getElementById('recentInvoicesBody');
+    const addClientBtn = document.querySelector('.add-client-btn');
+    const addInvoiceModal = document.getElementById('addInvoiceModal');
+    const addInvoiceForm = document.getElementById('addInvoiceForm');
     const clientForm = document.getElementById('clientForm');
-    const invoiceForm = document.getElementById('addInvoiceModal');
     const itemsTable = document.getElementById('itemsTable');
     const itemRowTemplate = document.getElementById('itemRowTemplate');
     const addItemBtn = document.getElementById('addItemBtn');
-    const subTotal = document.getElementById('subTotal');
-    const cgst = document.getElementById('cgst');
-    const sgst = document.getElementById('sgst');
-    const taxTotal = document.getElementById('taxTotal');
-    const total = document.getElementById('total');
-    const balance = document.getElementById('balance');
     const toAddress = document.getElementById('toAddress');
-    const totalClients = document.getElementById('totalClients');
-    const totalInvoices = document.getElementById('totalInvoices');
-
-    // Edit Invoice Elements
-    const editInvoiceForm = document.getElementById('editInvoiceForm');
-    const editItemsTable = document.getElementById('editItemsTable');
-    const editItemRowTemplate = document.getElementById('editItemRowTemplate');
-    const editAddItemBtn = document.getElementById('editAddItemBtn');
-    const editSubTotal = document.getElementById('editSubTotal');
-    const editCgst = document.getElementById('editCgst');
-    const editSgst = document.getElementById('editSgst');
-    const editTaxTotal = document.getElementById('editTaxTotal');
-    const editTotal = document.getElementById('editTotal');
-    const editBalance = document.getElementById('editBalance');
-    const editToAddress = document.getElementById('editToAddress');
+    const navItems = document.querySelectorAll('.nav-item');
 
     let selectedClientId = null;
     let currentInvoiceId = null;
 
-    // Function to get the next invoice number
+    // Navigation
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            navItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            const section = item.dataset.section;
+            if (section === 'dashboard') {
+                dashboardSection.style.display = 'block';
+                invoicesSection.style.display = 'none';
+                fetchDashboardData();
+            } else if (section === 'invoices') {
+                dashboardSection.style.display = 'none';
+                invoicesSection.style.display = 'block';
+                fetchAllInvoices();
+            }
+        });
+    });
+
     async function getNextInvoiceNumber() {
-        const { data, error } = await supabase
-            .from('invoices')
-            .select('invoice_number')
-            .order('invoice_number', { ascending: false })
-            .limit(1);
+        try {
+            const { data, error } = await supabase
+                .from('invoices')
+                .select('invoice_number')
+                .order('invoice_number', { ascending: false })
+                .limit(1);
 
-        if (error) {
-            console.error('Error fetching highest invoice number:', error);
-            return 'INV-300';
-        }
-
-        if (!data || data.length === 0) {
-            return 'INV-300';
-        }
-
-        const highestNumber = data[0].invoice_number.replace('INV-', '');
-        const nextNumber = Math.max(parseInt(highestNumber, 10) + 1, 300);
-        return `INV-${nextNumber}`;
-    }
-
-    // Fetch and display total counts
-    async function updateCounts() {
-        const { count: clientCount, error: clientError } = await supabase
-            .from('clients')
-            .select('*', { count: 'exact', head: true });
-
-        if (clientError) {
-            console.error('Error fetching client count:', clientError);
-            totalClients.textContent = 'Total Clients - Error';
-        } else {
-            totalClients.textContent = `Total Clients - ${clientCount}`;
-        }
-
-        const { count: invoiceCount, error: invoiceError } = await supabase
-            .from('invoices')
-            .select('*', { count: 'exact', head: true });
-
-        if (invoiceError) {
-            console.error('Error fetching invoice count:', invoiceError);
-            totalInvoices.textContent = 'Total Invoices - Error';
-        } else {
-            totalInvoices.textContent = `Total Invoices - ${invoiceCount}`;
-        }
-    }
-
-    // Fetch and display clients
-    async function fetchClients() {
-        const { data, error } = await supabase.from('clients').select('*');
-        if (error) {
-            console.error('Error fetching clients:', error);
-            alert('An error occurred while fetching clients.');
-            return;
-        }
-        clientsList.innerHTML = '';
-        data.forEach(client => {
-            const listItem = document.createElement('li');
-            listItem.className = 'list-group-item';
-            listItem.textContent = `${client.name} (${client.email})`;
-            listItem.dataset.id = client.id;
-            listItem.addEventListener('click', () => selectClient(client.id, client.name, client.email, client.address));
-            clientsList.appendChild(listItem);
-        });
-    }
-
-    // Select a client and fetch their invoices
-    function selectClient(id, name, email, address) {
-        document.querySelectorAll('#clientsList .list-group-item').forEach(item => item.classList.remove('active'));
-        document.querySelector(`#clientsList .list-group-item[data-id="${id}"]`).classList.add('active');
-        selectedClientId = id;
-        toAddress.textContent = `${name}\n${email}\n${address}`;
-        editToAddress.textContent = `${name}\n${email}\n${address}`;
-        addInvoiceBtn.disabled = false;
-        fetchInvoicesForClient(id);
-    }
-
-    // Fetch and display all invoices (default view)
-    async function fetchAllInvoices() {
-        const { data: invoices, error } = await supabase
-            .from('invoices')
-            .select('*, clients(name)')
-            .order('invoice_date', { ascending: false });
-
-        if (error) {
-            console.error('Error fetching all invoices:', error);
-            alert('An error occurred while fetching invoices.');
-            return;
-        }
-
-        invoicesTableBody.innerHTML = '';
-        invoices.forEach(invoice => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${invoice.invoice_number}</td>
-                <td>${invoice.clients.name}</td>
-                <td>${new Date(invoice.invoice_date).toLocaleDateString()}</td>
-                <td>
-                    <select class="form-control status-select" data-invoice-id="${invoice.id}">
-                        <option value="Pending" ${invoice.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                        <option value="Paid" ${invoice.status === 'Paid' ? 'selected' : ''}>Paid</option>
-                        <option value="Overdue" ${invoice.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
-                        <option value="Cancelled" ${invoice.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                    </select>
-                </td>
-                <td>
-                    <button class="btn btn-secondary edit-invoice" data-invoice-id="${invoice.id}">Edit</button>
-                    <button class="btn btn-info view-pdf" data-invoice-id="${invoice.id}">View PDF</button>
-                </td>
-            `;
-            invoicesTableBody.appendChild(row);
-        });
-
-        selectedClientId = null;
-        toAddress.textContent = '';
-        editToAddress.textContent = '';
-        addInvoiceBtn.disabled = true;
-    }
-
-    // Fetch and display invoices for a specific client
-    async function fetchInvoicesForClient(clientId) {
-        const { data: invoices, error } = await supabase
-            .from('invoices')
-            .select('*, clients(name)')
-            .eq('client_id', clientId)
-            .order('invoice_date', { ascending: false });
-
-        if (error) {
-            console.error('Error fetching invoices:', error);
-            alert('An error occurred while fetching invoices.');
-            return;
-        }
-
-        invoicesTableBody.innerHTML = '';
-        invoices.forEach(invoice => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${invoice.invoice_number}</td>
-                <td>${invoice.clients.name}</td>
-                <td>${new Date(invoice.invoice_date).toLocaleDateString()}</td>
-                <td>
-                    <select class="form-control status-select" data-invoice-id="${invoice.id}">
-                        <option value="Pending" ${invoice.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                        <option value="Paid" ${invoice.status === 'Paid' ? 'selected' : ''}>Paid</option>
-                        <option value="Overdue" ${invoice.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
-                        <option value="Cancelled" ${invoice.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                    </select>
-                </td>
-                <td>
-                    <button class="btn btn-secondary edit-invoice" data-invoice-id="${invoice.id}">Edit</button>
-                    <button class="btn btn-info view-pdf" data-invoice-id="${invoice.id}">View PDF</button>
-                </td>
-            `;
-            invoicesTableBody.appendChild(row);
-        });
-    }
-
-    // Update invoice status
-    async function updateInvoiceStatus(invoiceId, newStatus) {
-        const { error } = await supabase
-            .from('invoices')
-            .update({ status: newStatus })
-            .eq('id', invoiceId);
-
-        if (error) {
-            console.error('Error updating invoice status:', error);
-            alert('Failed to update invoice status.');
-        }
-    }
-
-    // Add a new client
-    async function addClient() {
-        const clientNameInput = document.getElementById('clientName');
-        const clientEmailInput = document.getElementById('clientEmail');
-        const clientAddressInput = document.getElementById('clientAddress');
-        
-        const name = clientNameInput.value;
-        const email = clientEmailInput.value;
-        const address = clientAddressInput.value;
-
-        if (name && email && address) {
-            const { error } = await supabase
-                .from('clients')
-                .insert([{ name, email, address }]);
             if (error) {
-                console.error('Error adding client:', error);
-                alert('An error occurred while adding the client.');
-            } else {
-                fetchClients();
-                updateCounts();
-                clientNameInput.value = '';
-                clientEmailInput.value = '';
-                clientAddressInput.value = '';
-                $('#addClientModal').modal('hide');
-                fetchAllInvoices();
+                console.error('Error fetching highest invoice number:', error);
+                throw error;
             }
-        } else {
-            alert('Please enter name, email, and address for the client.');
+
+            if (!data || data.length === 0) return 'INV-300';
+
+            const highestNumber = data[0].invoice_number.replace('INV-', '');
+            const nextNumber = Math.max(parseInt(highestNumber, 10) + 1, 300);
+            return `INV-${nextNumber}`;
+        } catch (error) {
+            console.error('Error in getNextInvoiceNumber:', error);
+            return 'INV-300';
         }
     }
 
-    // Add item row (Add Invoice)
-    function addItemRow() {
-        const newRow = itemRowTemplate.cloneNode(true);
-        newRow.removeAttribute('id');
-        newRow.style.display = '';
-        newRow.querySelector('.remove-item').addEventListener('click', () => {
-            newRow.remove();
-            updateTotals();
-        });
-        newRow.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', updateTotals);
-        });
-        itemsTable.querySelector('tbody').appendChild(newRow);
-    }
+    async function fetchDashboardData() {
+        try {
+            // Fetch income (sum of paid invoice totals from Supabase)
+            const { data: invoices, error: invoiceError } = await supabase
+                .from('invoices')
+                .select('total')
+                .eq('status', 'Paid');
 
-    // Add item row (Edit Invoice)
-    function addEditItemRow() {
-        const newRow = editItemRowTemplate.cloneNode(true);
-        newRow.removeAttribute('id');
-        newRow.style.display = '';
-        newRow.querySelector('.remove-item').addEventListener('click', () => {
-            newRow.remove();
-            updateEditTotals();
-        });
-        newRow.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', updateEditTotals);
-        });
-        editItemsTable.querySelector('tbody').appendChild(newRow);
-    }
+            if (invoiceError) throw invoiceError;
 
-    // Calculate and update totals (Add Invoice)
-    function updateTotals() {
-        let subTotalAmount = 0;
-        document.querySelectorAll('#itemsTable tbody tr:not(#itemRowTemplate)').forEach(row => {
-            const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
-            const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
-            const amount = quantity * rate;
-            row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
-            subTotalAmount += amount;
-        });
-        
-        const TAX_RATE = 0.09; // 9% for each GST component
-        const cgstAmount = subTotalAmount * TAX_RATE;
-        const sgstAmount = subTotalAmount * TAX_RATE;
-        const taxTotalAmount = cgstAmount + sgstAmount;
-        const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount;
+            const totalIncome = invoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
+            document.querySelector('.income-card').textContent = `Income: ₹${totalIncome.toFixed(2)}`;
 
-        // Single column layout: labels left-aligned, amounts right-aligned
-        const totalsContainer = document.createElement('div');
-        totalsContainer.className = 'totals-container';
-        totalsContainer.innerHTML = `
-            <div><span>Sub Total:</span><span style="float: right;">INR ${subTotalAmount.toFixed(2)}</span></div>
-            <div><span>CGST (9%):</span><span style="float: right;">INR ${cgstAmount.toFixed(2)}</span></div>
-            <div><span>SGST (9%):</span><span style="float: right;">INR ${sgstAmount.toFixed(2)}</span></div>
-            <div><span>Tax Total:</span><span style="float: right;">INR ${taxTotalAmount.toFixed(2)}</span></div>
-            <div><span>Total:</span><span style="float: right;">INR ${totalAmount.toFixed(2)}</span></div>
-            <div><span>Balance:</span><span style="float: right; color: red;">INR ${balanceAmount.toFixed(2)}</span></div>
-        `;
-        // Replace the existing content in the totals section
-        document.querySelector('.col-md-6.offset-md-6.text-end').innerHTML = '';
-        document.querySelector('.col-md-6.offset-md-6.text-end').appendChild(totalsContainer);
-    }
+            // Fetch and display all clients in cards
+            const { data: clients, error: clientError } = await supabase
+                .from('clients')
+                .select('*')
+                .order('name', { ascending: true });
 
-    // Calculate and update totals (Edit Invoice)
-    function updateEditTotals() {
-        let subTotalAmount = 0;
-        document.querySelectorAll('#editItemsTable tbody tr:not(#editItemRowTemplate)').forEach(row => {
-            const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
-            const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
-            const amount = quantity * rate;
-            row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
-            subTotalAmount += amount;
-        });
-        
-        const TAX_RATE = 0.09; // 9% for each GST component
-        const cgstAmount = subTotalAmount * TAX_RATE;
-        const sgstAmount = subTotalAmount * TAX_RATE;
-        const taxTotalAmount = cgstAmount + sgstAmount;
-        const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount;
+            if (clientError) throw clientError;
 
-        // Single column layout: labels left-aligned, amounts right-aligned
-        const totalsContainer = document.createElement('div');
-        totalsContainer.className = 'totals-container';
-        totalsContainer.innerHTML = `
-            <div><span>Sub Total:</span><span style="float: right;">INR ${subTotalAmount.toFixed(2)}</span></div>
-            <div><span>CGST (9%):</span><span style="float: right;">INR ${cgstAmount.toFixed(2)}</span></div>
-            <div><span>SGST (9%):</span><span style="float: right;">INR ${sgstAmount.toFixed(2)}</span></div>
-            <div><span>Tax Total:</span><span style="float: right;">INR ${taxTotalAmount.toFixed(2)}</span></div>
-            <div><span>Total:</span><span style="float: right;">INR ${totalAmount.toFixed(2)}</span></div>
-            <div><span>Balance:</span><span style="float: right; color: red;">INR ${balanceAmount.toFixed(2)}</span></div>
-        `;
-        // Replace the existing content in the totals section
-        document.querySelector('#editInvoiceModal .col-md-6.offset-md-6.text-end').innerHTML = '';
-        document.querySelector('#editInvoiceModal .col-md-6.offset-md-6.text-end').appendChild(totalsContainer);
-    }
+            clientsGrid.innerHTML = '';
+            clients.forEach(client => {
+                const card = document.createElement('div');
+                card.className = 'client-card';
+                card.innerHTML = `
+                    <h3>${client.name}</h3>
+                    <p>Email: ${client.email}</p>
+                    <p>Address: ${client.address}</p>
+                    <button class="create-invoice-btn" data-client-id="${client.id}">Create Invoice</button>
+                `;
+                clientsGrid.appendChild(card);
+            });
 
-    // Event listeners
-    addClientBtn.addEventListener('click', () => $('#addClientModal').modal('show'));
+            // Add event listener for "Create Invoice" buttons
+            document.querySelectorAll('.create-invoice-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    selectedClientId = btn.dataset.clientId;
+                    const { data: client, error } = await supabase
+                        .from('clients')
+                        .select('*')
+                        .eq('id', selectedClientId)
+                        .single();
 
-    addInvoiceBtn.addEventListener('click', async () => {
-        if (!selectedClientId) {
-            alert('Please select a client first.');
-            return;
+                    if (error) throw error;
+
+                    toAddress.innerHTML = `To: ${client.name}<br>${client.email}<br>${client.address}`;
+                    $('#addInvoiceModal').modal('show');
+                    try {
+                        const nextInvoiceNumber = await getNextInvoiceNumber();
+                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(1)').textContent = `Invoice No.: ${nextInvoiceNumber}`;
+                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(2)').innerHTML = `<strong>Date:</strong> <input type="date" id="date" required style="display: inline; margin-left: 5px;">`;
+                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(3)').innerHTML = `<strong>Invoice Due:</strong> <input type="date" id="dueDate" required style="display: inline; margin-left: 5px;">`;
+                    } catch (error) {
+                        console.error('Error setting invoice number:', error);
+                    }
+                });
+            });
+
+            // Fetch and display recent invoices
+            await fetchRecentInvoices();
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            clientsGrid.innerHTML = '<div class="client-card text-danger">Failed to load clients: ' + (error.message || 'Unknown error') + '</div>';
         }
-        $('#addInvoiceModal').modal('show');
-        const nextInvoiceNumber = await getNextInvoiceNumber();
-        document.getElementById('invoiceNumber').textContent = nextInvoiceNumber;
-    });
+    }
 
-    showAllInvoicesBtn.addEventListener('click', () => {
-        fetchAllInvoices();
-        document.querySelectorAll('#clientsList .list-group-item').forEach(item => item.classList.remove('active'));
-    });
+    async function fetchRecentInvoices() {
+        try {
+            const { data: invoices, error } = await supabase
+                .from('invoices')
+                .select('*, clients(name)')
+                .order('invoice_date', { ascending: false })
+                .limit(5); // Show the 5 most recent invoices
 
-    clientForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await addClient();
-    });
+            if (error) throw error;
 
-    addItemBtn.addEventListener('click', addItemRow);
-
-    editAddItemBtn.addEventListener('click', addEditItemRow);
-
-    invoicesTableBody.addEventListener('change', async function(e) {
-        if (e.target.classList.contains('status-select')) {
-            const invoiceId = e.target.dataset.invoiceId;
-            const newStatus = e.target.value;
-            await updateInvoiceStatus(invoiceId, newStatus);
-            if (selectedClientId) {
-                fetchInvoicesForClient(selectedClientId);
-            } else {
-                fetchAllInvoices();
+            recentInvoicesBody.innerHTML = '';
+            if (!invoices || invoices.length === 0) {
+                recentInvoicesBody.innerHTML = '<tr><td colspan="5">No recent invoices found</td></tr>';
+                return;
             }
-        }
-    });
 
-    // Edit invoice and View PDF
-    invoicesTableBody.addEventListener('click', async function(e) {
-        if (e.target.classList.contains('edit-invoice')) {
-            currentInvoiceId = e.target.dataset.invoiceId;
+            invoices.forEach(invoice => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${invoice.invoice_number}</td>
+                    <td>${invoice.clients.name}</td>
+                    <td>${new Date(invoice.invoice_date).toLocaleDateString()}</td>
+                    <td>
+                        <select class="form-control status-select" data-invoice-id="${invoice.id}">
+                            <option value="Pending" ${invoice.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="Paid" ${invoice.status === 'Paid' ? 'selected' : ''}>Paid</option>
+                            <option value="Overdue" ${invoice.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
+                            <option value="Cancelled" ${invoice.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary edit-invoice" data-invoice-id="${invoice.id}">Edit</button>
+                        <button class="btn btn-info view-pdf" data-invoice-id="${invoice.id}">View PDF</button>
+                    </td>
+                `;
+                recentInvoicesBody.appendChild(row);
+            });
+
+            // Add event listeners for status updates, edit, and view PDF
+            document.querySelectorAll('.status-select').forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const invoiceId = e.target.dataset.invoiceId;
+                    const newStatus = e.target.value;
+                    await updateInvoiceStatus(invoiceId, newStatus);
+                    fetchRecentInvoices(); // Refresh recent invoices
+                });
+            });
+
+            document.querySelectorAll('.edit-invoice, .view-pdf').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const invoiceId = e.target.dataset.invoiceId;
+                    if (e.target.classList.contains('edit-invoice')) {
+                        currentInvoiceId = invoiceId;
+                        await editInvoice(invoiceId);
+                    } else if (e.target.classList.contains('view-pdf')) {
+                        await generateInvoicePDF(invoiceId);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error fetching recent invoices:', error);
+            recentInvoicesBody.innerHTML = '<tr><td colspan="5" class="text-danger">Failed to load recent invoices: ' + (error.message || 'Unknown error') + '</td></tr>';
+        }
+    }
+
+    async function fetchAllInvoices() {
+        try {
+            const { data: invoices, error } = await supabase
+                .from('invoices')
+                .select('*, clients(name)')
+                .order('invoice_date', { ascending: false });
+
+            if (error) throw error;
+
+            invoicesGrid.innerHTML = '';
+            if (!invoices || invoices.length === 0) {
+                invoicesGrid.innerHTML = '<div class="invoice-card">No invoices found</div>';
+                return;
+            }
+
+            invoices.forEach(invoice => {
+                const card = document.createElement('div');
+                card.className = 'invoice-card';
+                card.innerHTML = `
+                    <div class="invoice-details">
+                        <p>Invoice No.: ${invoice.invoice_number}</p>
+                        <p>Client: ${invoice.clients.name}</p>
+                        <p>Date: ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
+                        <p>Status: 
+                            <select class="form-control status-select" data-invoice-id="${invoice.id}">
+                                <option value="Pending" ${invoice.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Paid" ${invoice.status === 'Paid' ? 'selected' : ''}>Paid</option>
+                                <option value="Overdue" ${invoice.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
+                                <option value="Cancelled" ${invoice.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                            </select>
+                        </p>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary edit-invoice" data-invoice-id="${invoice.id}">Edit</button>
+                        <button class="btn btn-info view-pdf" data-invoice-id="${invoice.id}">View PDF</button>
+                    </div>
+                `;
+                invoicesGrid.appendChild(card);
+            });
+
+            // Add event listeners for status updates, edit, and view PDF
+            document.querySelectorAll('.status-select').forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const invoiceId = e.target.dataset.invoiceId;
+                    const newStatus = e.target.value;
+                    await updateInvoiceStatus(invoiceId, newStatus);
+                    fetchAllInvoices(); // Refresh all invoices
+                });
+            });
+
+            document.querySelectorAll('.edit-invoice, .view-pdf').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const invoiceId = e.target.dataset.invoiceId;
+                    if (e.target.classList.contains('edit-invoice')) {
+                        currentInvoiceId = invoiceId;
+                        await editInvoice(invoiceId);
+                    } else if (e.target.classList.contains('view-pdf')) {
+                        await generateInvoicePDF(invoiceId);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error fetching invoices:', error);
+            invoicesGrid.innerHTML = '<div class="invoice-card text-danger">Failed to load invoices: ' + (error.message || 'Unknown error') + '</div>';
+        }
+    }
+
+    async function updateInvoiceStatus(invoiceId, newStatus) {
+        try {
+            const { error } = await supabase
+                .from('invoices')
+                .update({ status: newStatus })
+                .eq('id', invoiceId);
+
+            if (error) {
+                console.error('Error updating invoice status:', error);
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to update invoice status:', error);
+            alert('Failed to update invoice status: ' + (error.message || 'Unknown error'));
+        }
+    }
+
+    async function editInvoice(invoiceId) {
+        try {
             const { data: invoice, error } = await supabase
                 .from('invoices')
                 .select('*, clients(name, email, address)')
-                .eq('id', currentInvoiceId)
+                .eq('id', invoiceId)
                 .single();
 
             if (error) {
                 console.error('Error fetching invoice:', error);
-                alert('Failed to fetch invoice details.');
-                return;
+                throw error;
             }
 
-            document.getElementById('editInvoiceNumber').textContent = invoice.invoice_number;
-            document.getElementById('editDate').value = invoice.invoice_date;
-            document.getElementById('editDueDate').value = invoice.due_date;
-            editToAddress.textContent = `${invoice.clients.name}\n${invoice.clients.email}\n${invoice.clients.address}`;
+            const editModal = document.createElement('div');
+            editModal.className = 'modal fade';
+            editModal.id = 'editInvoiceModal';
+            editModal.setAttribute('tabindex', '-1');
+            editModal.setAttribute('aria-labelledby', 'editInvoiceModalLabel');
+            editModal.setAttribute('aria-hidden', 'true');
+            editModal.innerHTML = `
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editInvoiceModalLabel">Edit Invoice</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editInvoiceForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>From:</strong><br>
+                                        Grafikos<br>
+                                        Basement Plot 27, Srinivasa Nagar<br>
+                                        OMR Kottivakkam<br>
+                                        Chennai, Tamilnadu, 600041<br>
+                                        India<br>
+                                        GSTIN: 33AGXPV873G2ZB</p>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <p><strong>Invoice No.: ${invoice.invoice_number}</strong></p>
+                                        <p><strong>Date:</strong> <input type="date" id="editDate" value="${invoice.invoice_date}" required style="display: inline; margin-left: 5px;"></p>
+                                        <p><strong>Invoice Due:</strong> <input type="date" id="editDueDate" value="${invoice.due_date}" required style="display: inline; margin-left: 5px;"></p>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editToAddress" class="form-label">To:</label>
+                                            <div id="editToAddress">${invoice.clients.name}<br>${invoice.clients.email}<br>${invoice.clients.address}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editItemsTable" class="form-label">Items</label>
+                                            <table class="table table-bordered" id="editItemsTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Description</th>
+                                                        <th>Quantity</th>
+                                                        <th>Rate</th>
+                                                        <th>Amount</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr id="editItemRowTemplate" style="display: none;">
+                                                        <td><input type="text" class="form-control item-description"></td>
+                                                        <td><input type="number" class="form-control item-quantity"></td>
+                                                        <td><input type="number" step="0.01" class="form-control item-rate"></td>
+                                                        <td><span class="item-amount">INR 0.00</span></td>
+                                                        <td><button type="button" class="btn btn-danger remove-item">Remove</button></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn btn-primary mb-3" id="editAddItemBtn">Add Item</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="totals-container" id="editTotalsContainer"></div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col">
+                                        <p><strong>BANK DETAILS:</strong><br>
+                                        GRAFIKOS<br>
+                                        A/C No. 158500202082424,<br>
+                                        Tamilnad Mercantile Bank Ltd,<br>
+                                        Chennai-Thiruvanmiyur Branch,<br>
+                                        IFSC Code: TMBL0000158,<br>
+                                        MICR Code: 600060010.</p>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col text-center">
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
 
+            document.body.appendChild(editModal);
+            const editItemsTable = document.getElementById('editItemsTable');
+            const editItemRowTemplate = document.getElementById('editItemRowTemplate');
+            const editAddItemBtn = document.getElementById('editAddItemBtn');
+            const editTotalsContainer = document.getElementById('editTotalsContainer');
+            const editInvoiceForm = document.getElementById('editInvoiceForm');
+
+            // Populate items
             editItemsTable.querySelector('tbody').innerHTML = '';
             invoice.items.forEach(item => {
                 const newRow = editItemRowTemplate.cloneNode(true);
@@ -421,12 +415,129 @@ document.addEventListener('DOMContentLoaded', () => {
                 editItemsTable.querySelector('tbody').appendChild(newRow);
             });
 
-            updateEditTotals();
-            $('#editInvoiceModal').modal('show');
-        }
+            function updateEditTotals() {
+                let subTotalAmount = 0;
+                document.querySelectorAll('#editItemsTable tbody tr:not(#editItemRowTemplate)').forEach(row => {
+                    const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
+                    const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+                    const amount = quantity * rate;
+                    row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
+                    subTotalAmount += amount;
+                });
+                
+                const TAX_RATE = 0.09;
+                const cgstAmount = subTotalAmount * TAX_RATE;
+                const sgstAmount = subTotalAmount * TAX_RATE;
+                const taxTotalAmount = cgstAmount + sgstAmount;
+                const totalAmount = subTotalAmount + taxTotalAmount;
+                const balanceAmount = totalAmount;
 
-        if (e.target.classList.contains('view-pdf')) {
-            const invoiceId = e.target.dataset.invoiceId;
+                editTotalsContainer.innerHTML = `
+                    <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR ${cgstAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR ${sgstAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Tax Total:</span><span class="amount">INR ${taxTotalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Total:</span><span class="amount">INR ${totalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${balanceAmount.toFixed(2)}</span></div>
+                `;
+            }
+
+            updateEditTotals();
+
+            editAddItemBtn.addEventListener('click', () => {
+                const newRow = editItemRowTemplate.cloneNode(true);
+                newRow.removeAttribute('id');
+                newRow.style.display = '';
+                newRow.querySelector('.remove-item').addEventListener('click', () => {
+                    newRow.remove();
+                    updateEditTotals();
+                });
+                newRow.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('input', updateEditTotals);
+                });
+                editItemsTable.querySelector('tbody').appendChild(newRow);
+            });
+
+            editInvoiceForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                try {
+                    const date = document.getElementById('editDate').value;
+                    const dueDate = document.getElementById('editDueDate').value;
+
+                    if (!date || !dueDate) {
+                        alert('Please ensure both Date and Due Date are selected.');
+                        return;
+                    }
+
+                    let items = [];
+                    let allItemsValid = true;
+                    document.querySelectorAll('#editItemsTable tbody tr:not(#editItemRowTemplate)').forEach(row => {
+                        const description = row.querySelector('.item-description').value;
+                        const quantity = row.querySelector('.item-quantity').value;
+                        const rate = row.querySelector('.item-rate').value;
+
+                        if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
+                            allItemsValid = false;
+                            return;
+                        }
+
+                        items.push({
+                            description,
+                            quantity: parseFloat(quantity),
+                            rate: parseFloat(rate),
+                            amount: parseFloat(row.querySelector('.item-amount').textContent.replace('INR ', ''))
+                        });
+                    });
+
+                    if (!allItemsValid || items.length === 0) {
+                        alert('Please ensure all item fields are correctly filled out.');
+                        return;
+                    }
+
+                    const subTotalAmount = parseFloat(document.querySelector('#editTotalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
+                    const TAX_RATE = 0.09;
+                    const cgstAmount = subTotalAmount * TAX_RATE;
+                    const sgstAmount = subTotalAmount * TAX_RATE;
+                    const taxTotalAmount = cgstAmount + sgstAmount;
+                    const totalAmount = subTotalAmount + taxTotalAmount;
+                    const balanceAmount = totalAmount;
+
+                    const { error } = await supabase
+                        .from('invoices')
+                        .update({
+                            invoice_date: date,
+                            due_date: dueDate,
+                            items,
+                            sub_total: subTotalAmount,
+                            cgst: cgstAmount,
+                            sgst: sgstAmount,
+                            tax_total: taxTotalAmount,
+                            total: totalAmount,
+                            balance: balanceAmount
+                        })
+                        .eq('id', currentInvoiceId);
+
+                    if (error) throw error;
+
+                    $('#editInvoiceModal').modal('hide');
+                    fetchAllInvoices();
+                    fetchRecentInvoices(); // Refresh recent invoices
+                    document.body.removeChild(editModal); // Clean up the modal
+                } catch (error) {
+                    console.error('Failed to update invoice:', error);
+                    alert('An error occurred while updating the invoice: ' + (error.message || 'Unknown error'));
+                }
+            });
+
+            $('#editInvoiceModal').modal('show');
+        } catch (error) {
+            console.error('Failed to fetch invoice for editing:', error);
+            alert('Failed to fetch invoice details: ' + (error.message || 'Unknown error'));
+        }
+    }
+
+    async function generateInvoicePDF(invoiceId) {
+        try {
             const { data: invoice, error } = await supabase
                 .from('invoices')
                 .select('*, clients(name, email, address)')
@@ -435,8 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (error) {
                 console.error('Error fetching invoice for PDF:', error);
-                alert('Failed to fetch invoice details.');
-                return;
+                throw error;
             }
 
             const subTotalAmount = invoice.items.reduce((sum, item) => sum + item.amount, 0);
@@ -448,7 +558,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const docDefinition = {
                 content: [
-                    // Header
                     {
                         columns: [
                             { text: 'Invoice', style: 'header' },
@@ -460,8 +569,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         ],
                         margin: [0, 0, 0, 20]
                     },
-
-                    // From and Invoice Details
                     {
                         columns: [
                             [
@@ -474,26 +581,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                 'GSTIN: 33AGXPV873G2ZB'
                             ],
                             [
-                                { text: 'Invoice No.:', bold: true },
-                                invoice.invoice_number,
-                                { text: 'Date:', bold: true },
-                                new Date(invoice.invoice_date).toLocaleDateString(),
-                                { text: 'Invoice Due:', bold: true },
-                                new Date(invoice.due_date).toLocaleDateString()
+                                { text: `Invoice No.: ${invoice.invoice_number}`, bold: true },
+                                { text: `Date: ${new Date(invoice.invoice_date).toLocaleDateString()}`, bold: true },
+                                { text: `Invoice Due: ${new Date(invoice.due_date).toLocaleDateString()}`, bold: true }
                             ]
                         ],
                         columnGap: 20,
                         margin: [0, 0, 0, 20]
                     },
-
-                    // Client Details
                     {
-                        text: `To: ${invoice.clients.name}\n${invoice.clients.email}\n${invoice.clients.address}`,
+                        ul: [
+                            { text: `To: ${invoice.clients.name}`, bold: true },
+                            { text: invoice.clients.email },
+                            { text: invoice.clients.address }
+                        ],
                         style: 'clientInfo',
                         margin: [0, 0, 0, 20]
                     },
-
-                    // Items Table
                     {
                         table: {
                             headerRows: 1,
@@ -515,15 +619,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                         margin: [0, 0, 0, 20]
                     },
-
-                    // Totals (single column: labels left-aligned, amounts right-aligned)
                     {
                         table: {
                             widths: ['*', 'auto'],
                             body: [
                                 [{ text: 'Sub Total:', bold: true, alignment: 'left' }, { text: `INR ${subTotalAmount.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'CGST (9%):', bold: true, alignment: 'left' }, { text: `INR ${cgstAmount.toFixed(2)}`, alignment: 'right' }],
-                                [{ text: 'SGST (9%):', bold: true, alignment: 'left' }, { text: 'INR', alignment: 'right' }],
+                                [{ text: 'SGST (9%):', bold: true, alignment: 'left' }, { text: `INR ${sgstAmount.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'Tax Total:', bold: true, alignment: 'left' }, { text: `INR ${taxTotalAmount.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'Total:', bold: true, alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'Balance:', bold: true, color: 'red', alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }]
@@ -531,8 +633,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                         margin: [0, 0, 0, 20]
                     },
-
-                    // Bank Details
                     {
                         text: 'BANK DETAILS:',
                         bold: true,
@@ -544,8 +644,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Chennai-Thiruvanmiyur Branch,',
                     'IFSC Code: TMBL0000158,',
                     'MICR Code: 600060010.',
-                    
-                    // Footer
                     {
                         text: 'Email: designs@grafikos.in',
                         style: 'footer',
@@ -566,167 +664,184 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             pdfMake.createPdf(docDefinition).open();
+        } catch (error) {
+            console.error('Failed to fetch invoice for PDF:', error);
+            alert('Failed to fetch invoice details: ' + (error.message || 'Unknown error'));
         }
-    });
+    }
 
-    // Add Invoice submission
-    invoiceForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        
-        const date = document.getElementById('date').value;
-        const dueDate = document.getElementById('dueDate').value;
-        
-        if (!date || !dueDate) {
-            alert('Please ensure both Date and Due Date are selected.');
-            return;
-        }
-    
-        let items = [];
-        let allItemsValid = true;
+    function addItemRow() {
+        const newRow = itemRowTemplate.cloneNode(true);
+        newRow.removeAttribute('id');
+        newRow.style.display = '';
+        newRow.querySelector('.remove-item').addEventListener('click', () => {
+            newRow.remove();
+            updateTotals();
+        });
+        newRow.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateTotals);
+        });
+        itemsTable.querySelector('tbody').appendChild(newRow);
+    }
+
+    function updateTotals() {
+        let subTotalAmount = 0;
         document.querySelectorAll('#itemsTable tbody tr:not(#itemRowTemplate)').forEach(row => {
-            const description = row.querySelector('.item-description').value;
-            const quantity = row.querySelector('.item-quantity').value;
-            const rate = row.querySelector('.item-rate').value;
-            
-            if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
-                allItemsValid = false;
-                return;
-            }
-            
-            items.push({
-                description,
-                quantity: parseFloat(quantity),
-                rate: parseFloat(rate),
-                amount: parseFloat(row.querySelector('.item-amount').textContent.replace('INR ', ''))
-            });
+            const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
+            const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+            const amount = quantity * rate;
+            row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
+            subTotalAmount += amount;
         });
-    
-        if (!allItemsValid || items.length === 0) {
-            alert('Please ensure all item fields are correctly filled out.');
-            return;
-        }
-    
-        if (!selectedClientId) {
-            alert('Please select a client before submitting the invoice.');
-            return;
-        }
-
-        const invoiceNumber = document.getElementById('invoiceNumber').textContent;
-        const subTotalAmount = parseFloat(document.querySelector('.totals-container div:first-child span:last-child').textContent.replace('INR ', '')) || 0;
-        const TAX_RATE = 0.09; // 9% for each GST component
+        
+        const TAX_RATE = 0.09;
         const cgstAmount = subTotalAmount * TAX_RATE;
         const sgstAmount = subTotalAmount * TAX_RATE;
         const taxTotalAmount = cgstAmount + sgstAmount;
         const totalAmount = subTotalAmount + taxTotalAmount;
         const balanceAmount = totalAmount;
 
-        const { error } = await supabase
-            .from('invoices')
-            .insert([{
-                client_id: selectedClientId,
-                invoice_number: invoiceNumber,
-                invoice_date: date,
-                due_date: dueDate,
-                items,
-                sub_total: subTotalAmount,
-                cgst: cgstAmount,
-                sgst: sgstAmount,
-                tax_total: taxTotalAmount,
-                total: totalAmount,
-                balance: balanceAmount,
-                status: 'Pending'
-            }]);
+        const totalsContainer = document.querySelector('#totalsContainer');
+        totalsContainer.innerHTML = `
+            <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
+            <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR ${cgstAmount.toFixed(2)}</span></div>
+            <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR ${sgstAmount.toFixed(2)}</span></div>
+            <div class="total-row"><span class="label">Tax Total:</span><span class="amount">INR ${taxTotalAmount.toFixed(2)}</span></div>
+            <div class="total-row"><span class="label">Total:</span><span class="amount">INR ${totalAmount.toFixed(2)}</span></div>
+            <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${balanceAmount.toFixed(2)}</span></div>
+        `;
+    }
 
-        if (error) {
-            console.error('Error adding invoice:', error);
-            alert('An error occurred while adding the invoice.');
-        } else {
-            $('#addInvoiceModal').modal('hide');
-            if (selectedClientId) {
-                fetchInvoicesForClient(selectedClientId);
-            } else {
-                fetchAllInvoices();
-            }
-            updateCounts();
-        }
-    });
+    addItemBtn.addEventListener('click', addItemRow);
 
-    // Edit Invoice submission
-    editInvoiceForm.addEventListener('submit', async (event) => {
+    addInvoiceForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-
-        const date = document.getElementById('editDate').value;
-        const dueDate = document.getElementById('editDueDate').value;
-
-        if (!date || !dueDate) {
-            alert('Please ensure both Date and Due Date are selected.');
-            return;
-        }
-
-        let items = [];
-        let allItemsValid = true;
-        document.querySelectorAll('#editItemsTable tbody tr:not(#editItemRowTemplate)').forEach(row => {
-            const description = row.querySelector('.item-description').value;
-            const quantity = row.querySelector('.item-quantity').value;
-            const rate = row.querySelector('.item-rate').value;
-
-            if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
-                allItemsValid = false;
+        try {
+            const date = document.getElementById('date').value;
+            const dueDate = document.getElementById('dueDate').value;
+            
+            if (!date || !dueDate) {
+                alert('Please ensure both Date and Due Date are selected.');
+                return;
+            }
+        
+            let items = [];
+            let allItemsValid = true;
+            document.querySelectorAll('#itemsTable tbody tr:not(#itemRowTemplate)').forEach(row => {
+                const description = row.querySelector('.item-description').value;
+                const quantity = row.querySelector('.item-quantity').value;
+                const rate = row.querySelector('.item-rate').value;
+                
+                if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
+                    allItemsValid = false;
+                    return;
+                }
+                
+                items.push({
+                    description,
+                    quantity: parseFloat(quantity),
+                    rate: parseFloat(rate),
+                    amount: parseFloat(row.querySelector('.item-amount').textContent.replace('INR ', ''))
+                });
+            });
+        
+            if (!allItemsValid || items.length === 0) {
+                alert('Please ensure all item fields are correctly filled out.');
+                return;
+            }
+        
+            if (!selectedClientId) {
+                alert('Please select a client before submitting the invoice.');
                 return;
             }
 
-            items.push({
-                description,
-                quantity: parseFloat(quantity),
-                rate: parseFloat(rate),
-                amount: parseFloat(row.querySelector('.item-amount').textContent.replace('INR ', ''))
-            });
-        });
+            const invoiceNumber = await getNextInvoiceNumber();
+            const subTotalAmount = parseFloat(document.querySelector('#totalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
+            const TAX_RATE = 0.09;
+            const cgstAmount = subTotalAmount * TAX_RATE;
+            const sgstAmount = subTotalAmount * TAX_RATE;
+            const taxTotalAmount = cgstAmount + sgstAmount;
+            const totalAmount = subTotalAmount + taxTotalAmount;
+            const balanceAmount = totalAmount;
 
-        if (!allItemsValid || items.length === 0) {
-            alert('Please ensure all item fields are correctly filled out.');
-            return;
-        }
+            const { error } = await supabase
+                .from('invoices')
+                .insert([{
+                    client_id: selectedClientId,
+                    invoice_number: invoiceNumber,
+                    invoice_date: date,
+                    due_date: dueDate,
+                    items,
+                    sub_total: subTotalAmount,
+                    cgst: cgstAmount,
+                    sgst: sgstAmount,
+                    tax_total: taxTotalAmount,
+                    total: totalAmount,
+                    balance: balanceAmount,
+                    status: 'Pending'
+                }]);
 
-        const subTotalAmount = parseFloat(document.querySelector('#editInvoiceModal .totals-container div:first-child span:last-child').textContent.replace('INR ', '')) || 0;
-        const TAX_RATE = 0.09; // 9% for each GST component
-        const cgstAmount = subTotalAmount * TAX_RATE;
-        const sgstAmount = subTotalAmount * TAX_RATE;
-        const taxTotalAmount = cgstAmount + sgstAmount;
-        const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount;
+            if (error) throw error;
 
-        const { error } = await supabase
-            .from('invoices')
-            .update({
-                invoice_date: date,
-                due_date: dueDate,
-                items,
-                sub_total: subTotalAmount,
-                cgst: cgstAmount,
-                sgst: sgstAmount,
-                tax_total: taxTotalAmount,
-                total: totalAmount,
-                balance: balanceAmount
-            })
-            .eq('id', currentInvoiceId);
-
-        if (error) {
-            console.error('Error updating invoice:', error);
-            alert('An error occurred while updating the invoice.');
-        } else {
-            $('#editInvoiceModal').modal('hide');
-            if (selectedClientId) {
-                fetchInvoicesForClient(selectedClientId);
-            } else {
-                fetchAllInvoices();
-            }
-            updateCounts();
+            $('#addInvoiceModal').modal('hide');
+            fetchAllInvoices();
+            fetchRecentInvoices(); // Refresh recent invoices after adding
+        } catch (error) {
+            console.error('Failed to add invoice:', error);
+            alert('An error occurred while adding the invoice: ' + (error.message || 'Unknown error'));
         }
     });
 
-    // Initial fetch of clients and all invoices
-    fetchClients();
-    fetchAllInvoices();
-    updateCounts();
+    // Add Client functionality
+    addClientBtn.addEventListener('click', () => $('#addClientModal').modal('show'));
+
+    clientForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const clientNameInput = document.getElementById('clientName');
+            const clientEmailInput = document.getElementById('clientEmail');
+            const clientAddressInput = document.getElementById('clientAddress');
+            
+            const name = clientNameInput.value.trim();
+            const email = clientEmailInput.value.trim();
+            const address = clientAddressInput.value.trim();
+
+            if (!name || !email || !address) {
+                alert('Please enter name, email, and address for the client.');
+                return;
+            }
+
+            const { error } = await supabase
+                .from('clients')
+                .insert([{ name, email, address }]);
+
+            if (error) {
+                console.error('Error adding client:', error);
+                throw error;
+            }
+
+            await fetchDashboardData(); // Refresh clients
+            clientNameInput.value = '';
+            clientEmailInput.value = '';
+            clientAddressInput.value = '';
+            $('#addClientModal').modal('hide');
+        } catch (error) {
+            console.error('Failed to add client:', error);
+            alert('An error occurred while adding the client: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    // Initialize with Dashboard view
+    async function initialize() {
+        try {
+            dashboardSection.style.display = 'block';
+            invoicesSection.style.display = 'none';
+            await fetchDashboardData();
+        } catch (error) {
+            console.error('Initialization error:', error);
+            clientsGrid.innerHTML = '<div class="client-card text-danger">Failed to load dashboard: ' + (error.message || 'Unknown error') + '</div>';
+        }
+    }
+
+    initialize();
 });
