@@ -15,12 +15,12 @@ body {
 
 /* Specific Column Styling */
 #col-1 {
-    background-color: rgb(241, 248, 255);;
+    background-color: rgb(241, 248, 255);
     display: flex;
     align-items: center;
 }
 
-#col-2{
+#col-2 {
     align-items: center;
     justify-content: space-between;
 }
@@ -30,7 +30,7 @@ body {
 }
 
 #col-4 {
-    background-color: rgb(241, 248, 255);;
+    background-color: rgb(241, 248, 255);
     min-height: 100vh;
     color: #000;
 }
@@ -40,21 +40,25 @@ body {
     max-width: 1000px !important;
 }
 
-#addInvoiceModal .modal-body {
+#addInvoiceModal .modal-body,
+#editInvoiceModal .modal-body {
     padding: 2rem;
 }
 
-#addInvoiceModal .modal-content {
+#addInvoiceModal .modal-content,
+#editInvoiceModal .modal-content {
     width: 100%;
     height: 100%;
 }
 
 /* Styling for From and To Addresses */
-#addInvoiceModal .modal-body p {
+#addInvoiceModal .modal-body p,
+#editInvoiceModal .modal-body p {
     margin-bottom: 0;
 }
 
-#toAddress {
+#toAddress,
+#editToAddress {
     font-weight: bold;
     border: 1px solid #ced4da;
     padding: 10px;
@@ -63,49 +67,76 @@ body {
 }
 
 /* Styling for Invoice Details */
-#invoiceNumber, #date, #dueDate {
+#invoiceNumber, #date, #dueDate,
+#editInvoiceNumber, #editDate, #editDueDate {
     font-weight: bold;
 }
 
 /* Items Table Styling */
-#itemsTable {
+#itemsTable,
+#editItemsTable {
     margin-bottom: 0;
 }
 
-#itemsTable th, #itemsTable td {
+#itemsTable th, #itemsTable td,
+#editItemsTable th, #editItemsTable td {
     vertical-align: middle;
 }
 
-#itemsTable input.form-control {
+#itemsTable input.form-control,
+#editItemsTable input.form-control {
     width: 100%;
 }
 
 /* Add Item Button */
-#addItemBtn {
+#addItemBtn,
+#editAddItemBtn {
     margin-top: 10px;
 }
 
 /* Totals Section Styling */
-#addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
+#addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p,
+#editInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
     margin-bottom: 5px;
 }
 
 /* Highlighting Balance */
-#balance {
+#balance,
+#editBalance {
     font-size: 1.2em;
     color: red;
     font-weight: bold;
 }
 
 /* Bank Details Styling */
-#addInvoiceModal .modal-body p strong {
+#addInvoiceModal .modal-body p strong,
+#editInvoiceModal .modal-body p strong {
     display: block;
 }
 
 /* Submit Button Styling */
-#addInvoiceModal .modal-body .btn-primary {
+#addInvoiceModal .modal-body .btn-primary,
+#editInvoiceModal .modal-body .btn-primary {
     width: 200px;
     margin-top: 20px;
+}
+
+/* Action Buttons in Table */
+.edit-invoice,
+.view-pdf {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    margin-right: 5px;
+}
+
+/* Client List Styling */
+.clients-list .list-group-item {
+    cursor: pointer; /* Change cursor to pointer on hover */
+    transition: background-color 0.2s ease; /* Smooth transition for hover effect */
+}
+
+.clients-list .list-group-item:hover {
+    background-color: #e9ecef; /* Light gray hover effect */
 }
 
 /* Responsive Design */
@@ -114,7 +145,8 @@ body {
         max-width: 90% !important;
     }
     
-    #addInvoiceModal .modal-body {
+    #addInvoiceModal .modal-body,
+    #editInvoiceModal .modal-body {
         padding: 1rem;
     }
     
@@ -126,11 +158,13 @@ body {
         font-size: 1.25rem;
     }
     
-    #itemsTable th, #itemsTable td {
+    #itemsTable th, #itemsTable td,
+    #editItemsTable th, #editItemsTable td {
         font-size: 0.9em;
     }
     
-    #addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
+    #addInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p,
+    #editInvoiceModal .modal-body .col-md-6.offset-md-6 .text-end p {
         font-size: 0.9em;
     }
 }
