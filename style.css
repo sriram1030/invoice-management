@@ -339,3 +339,48 @@ body {
         font-size: 12px;
     }
 }
+
+/* Totals Container Styling */
+.totals-container {
+    width: 100%;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.total-row .label {
+    font-weight: 600;
+    font-size: 22px;
+    color: #2d3748;
+    min-width: 120px; /* Ensures labels have consistent width for alignment */
+    text-align: left;
+}
+
+.total-row .amount {
+    text-align: right;
+    color: #4a5568;
+    font-size: 24px;
+}
+
+.total-row .amount.red {
+    color: #e53e3e; /* Red for Balance */
+}
+
+/* Ensure this styling applies to both add and edit modals */
+#totalsContainer, #editTotalsContainer {
+    display: block;
+    visibility: visible;
+    overflow: visible;
+}
