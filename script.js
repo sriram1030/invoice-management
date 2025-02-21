@@ -284,19 +284,27 @@ document.addEventListener('DOMContentLoaded', () => {
             subTotalAmount += amount;
         });
         
-        // Use specific values from the image (hardcoded for consistency with your example)
-        const cgstAmount = 180.00; // Hardcoded to match your image
-        const sgstAmount = 180.00; // Hardcoded to match your image
-        const taxTotalAmount = 360.00; // Hardcoded to match your image
+        const TAX_RATE = 0.09; // 9% for each GST component
+        const cgstAmount = subTotalAmount * TAX_RATE;
+        const sgstAmount = subTotalAmount * TAX_RATE;
+        const taxTotalAmount = cgstAmount + sgstAmount;
         const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount; // Balance equals Total since paid_to_date is removed
+        const balanceAmount = totalAmount;
 
-        subTotal.textContent = `INR ${subTotalAmount.toFixed(2)}`;
-        cgst.textContent = `INR ${cgstAmount.toFixed(2)}`;
-        sgst.textContent = `INR ${sgstAmount.toFixed(2)}`;
-        taxTotal.textContent = `INR ${taxTotalAmount.toFixed(2)}`;
-        total.textContent = `INR ${totalAmount.toFixed(2)}`;
-        balance.textContent = `INR ${balanceAmount.toFixed(2)}`;
+        // Single column layout: labels left-aligned, amounts right-aligned
+        const totalsContainer = document.createElement('div');
+        totalsContainer.className = 'totals-container';
+        totalsContainer.innerHTML = `
+            <div><span>Sub Total:</span><span style="float: right;">INR ${subTotalAmount.toFixed(2)}</span></div>
+            <div><span>CGST (9%):</span><span style="float: right;">INR ${cgstAmount.toFixed(2)}</span></div>
+            <div><span>SGST (9%):</span><span style="float: right;">INR ${sgstAmount.toFixed(2)}</span></div>
+            <div><span>Tax Total:</span><span style="float: right;">INR ${taxTotalAmount.toFixed(2)}</span></div>
+            <div><span>Total:</span><span style="float: right;">INR ${totalAmount.toFixed(2)}</span></div>
+            <div><span>Balance:</span><span style="float: right; color: red;">INR ${balanceAmount.toFixed(2)}</span></div>
+        `;
+        // Replace the existing content in the totals section
+        document.querySelector('.col-md-6.offset-md-6.text-end').innerHTML = '';
+        document.querySelector('.col-md-6.offset-md-6.text-end').appendChild(totalsContainer);
     }
 
     // Calculate and update totals (Edit Invoice)
@@ -310,19 +318,27 @@ document.addEventListener('DOMContentLoaded', () => {
             subTotalAmount += amount;
         });
         
-        // Use specific values from the image (hardcoded for consistency with your example)
-        const cgstAmount = 180.00; // Hardcoded to match your image
-        const sgstAmount = 180.00; // Hardcoded to match your image
-        const taxTotalAmount = 360.00; // Hardcoded to match your image
+        const TAX_RATE = 0.09; // 9% for each GST component
+        const cgstAmount = subTotalAmount * TAX_RATE;
+        const sgstAmount = subTotalAmount * TAX_RATE;
+        const taxTotalAmount = cgstAmount + sgstAmount;
         const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount; // Balance equals Total since paid_to_date is removed
+        const balanceAmount = totalAmount;
 
-        editSubTotal.textContent = `INR ${subTotalAmount.toFixed(2)}`;
-        editCgst.textContent = `INR ${cgstAmount.toFixed(2)}`;
-        editSgst.textContent = `INR ${sgstAmount.toFixed(2)}`;
-        editTaxTotal.textContent = `INR ${taxTotalAmount.toFixed(2)}`;
-        editTotal.textContent = `INR ${totalAmount.toFixed(2)}`;
-        editBalance.textContent = `INR ${balanceAmount.toFixed(2)}`;
+        // Single column layout: labels left-aligned, amounts right-aligned
+        const totalsContainer = document.createElement('div');
+        totalsContainer.className = 'totals-container';
+        totalsContainer.innerHTML = `
+            <div><span>Sub Total:</span><span style="float: right;">INR ${subTotalAmount.toFixed(2)}</span></div>
+            <div><span>CGST (9%):</span><span style="float: right;">INR ${cgstAmount.toFixed(2)}</span></div>
+            <div><span>SGST (9%):</span><span style="float: right;">INR ${sgstAmount.toFixed(2)}</span></div>
+            <div><span>Tax Total:</span><span style="float: right;">INR ${taxTotalAmount.toFixed(2)}</span></div>
+            <div><span>Total:</span><span style="float: right;">INR ${totalAmount.toFixed(2)}</span></div>
+            <div><span>Balance:</span><span style="float: right; color: red;">INR ${balanceAmount.toFixed(2)}</span></div>
+        `;
+        // Replace the existing content in the totals section
+        document.querySelector('#editInvoiceModal .col-md-6.offset-md-6.text-end').innerHTML = '';
+        document.querySelector('#editInvoiceModal .col-md-6.offset-md-6.text-end').appendChild(totalsContainer);
     }
 
     // Event listeners
@@ -423,6 +439,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const subTotalAmount = invoice.items.reduce((sum, item) => sum + item.amount, 0);
+            const TAX_RATE = 0.09;
+            const cgstAmount = subTotalAmount * TAX_RATE;
+            const sgstAmount = subTotalAmount * TAX_RATE;
+            const taxTotalAmount = cgstAmount + sgstAmount;
+            const totalAmount = subTotalAmount + taxTotalAmount;
+
             const docDefinition = {
                 content: [
                     // Header
@@ -493,31 +516,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         margin: [0, 0, 0, 20]
                     },
 
-                    // Totals (right-aligned as in image)
+                    // Totals (single column: labels left-aligned, amounts right-aligned)
                     {
-                        columns: [
-                            {},
-                            [
-                                { text: 'Sub Total:', bold: true, alignment: 'right' },
-                                `INR ${invoice.sub_total.toFixed(2)}`,
-                                { text: 'CGST (9%):', bold: true, alignment: 'right' },
-                                `INR ${invoice.cgst.toFixed(2)}`,
-                                { text: 'SGST (9%):', bold: true, alignment: 'right' },
-                                `INR ${invoice.sgst.toFixed(2)}`,
-                                { text: 'Tax Total:', bold: true, alignment: 'right' },
-                                `INR ${invoice.tax_total.toFixed(2)}`,
-                                { text: 'Total:', bold: true, alignment: 'right' },
-                                `INR ${invoice.total.toFixed(2)}`,
-                                {
-                                    text: 'Balance:',
-                                    bold: true,
-                                    color: 'red',
-                                    alignment: 'right'
-                                },
-                                `INR ${invoice.balance.toFixed(2)}`
+                        table: {
+                            widths: ['*', 'auto'],
+                            body: [
+                                [{ text: 'Sub Total:', bold: true, alignment: 'left' }, { text: `INR ${subTotalAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'CGST (9%):', bold: true, alignment: 'left' }, { text: `INR ${cgstAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'SGST (9%):', bold: true, alignment: 'left' }, { text: 'INR', alignment: 'right' }],
+                                [{ text: 'Tax Total:', bold: true, alignment: 'left' }, { text: `INR ${taxTotalAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'Total:', bold: true, alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'Balance:', bold: true, color: 'red', alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }]
                             ]
-                        ],
-                        columnGap: 20
+                        },
+                        margin: [0, 0, 0, 20]
                     },
 
                     // Bank Details
@@ -600,12 +612,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const invoiceNumber = document.getElementById('invoiceNumber').textContent;
-        const subTotal = parseFloat(subTotal.textContent.replace('INR ', ''));
-        const cgst = 180.00; // Hardcoded to match your image
-        const sgst = 180.00; // Hardcoded to match your image
-        const taxTotal = 360.00; // Hardcoded to match your image
-        const total = subTotal + taxTotal;
-        const balance = total; // Balance equals Total since paid_to_date is removed
+        const subTotalAmount = parseFloat(document.querySelector('.totals-container div:first-child span:last-child').textContent.replace('INR ', '')) || 0;
+        const TAX_RATE = 0.09; // 9% for each GST component
+        const cgstAmount = subTotalAmount * TAX_RATE;
+        const sgstAmount = subTotalAmount * TAX_RATE;
+        const taxTotalAmount = cgstAmount + sgstAmount;
+        const totalAmount = subTotalAmount + taxTotalAmount;
+        const balanceAmount = totalAmount;
 
         const { error } = await supabase
             .from('invoices')
@@ -615,12 +628,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 invoice_date: date,
                 due_date: dueDate,
                 items,
-                sub_total: subTotal,
-                cgst: cgst,
-                sgst: sgst,
-                tax_total: taxTotal,
-                total: total,
-                balance: balance,
+                sub_total: subTotalAmount,
+                cgst: cgstAmount,
+                sgst: sgstAmount,
+                tax_total: taxTotalAmount,
+                total: totalAmount,
+                balance: balanceAmount,
                 status: 'Pending'
             }]);
 
@@ -675,12 +688,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const subTotal = parseFloat(editSubTotal.textContent.replace('INR ', ''));
-        const cgst = 180.00; // Hardcoded to match your image
-        const sgst = 180.00; // Hardcoded to match your image
-        const taxTotal = 360.00; // Hardcoded to match your image
-        const total = subTotal + taxTotal;
-        const balance = total; // Balance equals Total since paid_to_date is removed
+        const subTotalAmount = parseFloat(document.querySelector('#editInvoiceModal .totals-container div:first-child span:last-child').textContent.replace('INR ', '')) || 0;
+        const TAX_RATE = 0.09; // 9% for each GST component
+        const cgstAmount = subTotalAmount * TAX_RATE;
+        const sgstAmount = subTotalAmount * TAX_RATE;
+        const taxTotalAmount = cgstAmount + sgstAmount;
+        const totalAmount = subTotalAmount + taxTotalAmount;
+        const balanceAmount = totalAmount;
 
         const { error } = await supabase
             .from('invoices')
@@ -688,12 +702,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 invoice_date: date,
                 due_date: dueDate,
                 items,
-                sub_total: subTotal,
-                cgst: cgst,
-                sgst: sgst,
-                tax_total: taxTotal,
-                total: total,
-                balance: balance
+                sub_total: subTotalAmount,
+                cgst: cgstAmount,
+                sgst: sgstAmount,
+                tax_total: taxTotalAmount,
+                total: totalAmount,
+                balance: balanceAmount
             })
             .eq('id', currentInvoiceId);
 
