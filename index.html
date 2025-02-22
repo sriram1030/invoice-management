@@ -41,16 +41,31 @@
             </div>
         </header>
 
-        <!-- Dashboard Section (Default View, now with metric cards) -->
+        <!-- Dashboard Section (Default View, with metric cards) -->
         <section class="dashboard-section">
             <div class="dashboard-grid" id="dashboardGrid"></div>
         </section>
 
-        <!-- Invoices Section (Hidden by default, now with Recent Invoices table and Add Invoice button) -->
+        <!-- Invoices Section (Hidden by default, now with Recent Invoices table, search, and filters) -->
         <section class="invoices-section" style="display: none;">
             <div class="invoices-header">
                 <h3>Recent Invoices</h3>
-                <button class="btn btn-primary add-invoice-btn" data-bs-toggle="modal" data-bs-target="#addInvoiceModal">Add Invoice</button>
+                <div class="invoice-filters">
+                    <input type="text" class="form-control search-invoice-id" placeholder="Search by ID..." style="width: 200px; margin-right: 10px;">
+                    <select class="form-control filter-client" style="width: 200px; margin-right: 10px;">
+                        <option value="">All Clients</option>
+                        <!-- Clients will be populated dynamically via JavaScript -->
+                    </select>
+                    <select class="form-control filter-status" style="width: 150px;">
+                        <option value="">All Statuses</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Unpaid">Unpaid</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <button class="btn btn-primary add-invoice-btn" data-bs-toggle="modal" data-bs-target="#addInvoiceModal">Add Invoice</button>
+                </div>
             </div>
             <div class="recent-invoices" id="recentInvoices">
                 <table class="table table-striped" id="recentInvoicesTable">

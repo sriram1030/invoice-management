@@ -138,17 +138,44 @@ body {
 }
 
 /* Invoices Section Styles */
+.invoices-section {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    min-height: 200px;
+}
+
 .invoices-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
 }
 
 .invoices-header h3 {
     font-size: 20px;
     color: #2d3748;
     margin: 0;
+}
+
+.invoice-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+
+.invoice-filters .form-control {
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 8px 12px;
+}
+
+.invoice-filters .form-control:focus {
+    border-color: #38a169;
+    box-shadow: 0 0 0 0.2rem rgba(56, 161, 105, 0.25);
 }
 
 .add-invoice-btn {
@@ -422,15 +449,21 @@ body {
     transition: border-color 0.3s ease;
 }
 
-/* Ensure form-control styles apply to clientSelect */
-#clientSelect.form-control {
+/* Ensure form-control styles apply to clientSelect and filters */
+#clientSelect.form-control,
+.filter-client.form-control,
+.filter-status.form-control,
+.search-invoice-id.form-control {
     font-size: 14px;
     border-radius: 8px;
     border: 1px solid #e5e7eb;
     padding: 8px 12px;
 }
 
-#clientSelect.form-control:focus {
+#clientSelect.form-control:focus,
+.filter-client.form-control:focus,
+.filter-status.form-control:focus,
+.search-invoice-id.form-control:focus {
     border-color: #38a169;
     box-shadow: 0 0 0 0.2rem rgba(56, 161, 105, 0.25);
 }
@@ -507,6 +540,18 @@ body {
     .invoices-header, .clients-header {
         flex-direction: column;
         gap: 10px;
+    }
+
+    .invoice-filters {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .invoice-filters .form-control {
+        width: 100%;
+        font-size: 12px;
+        padding: 6px 10px;
     }
 
     .reports-section {
