@@ -1,0 +1,13 @@
+grafikos-dashboard/
+├── index.html
+├── style.css
+├── js/
+│   ├── config.js
+│   ├── navigation.js
+│   ├── dashboard.js
+│   ├── invoices.js
+│   ├── estimates.js
+│   ├── reports.js
+│   ├── settings.js
+│   ├── utils.js
+│   └── main.js

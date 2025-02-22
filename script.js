@@ -7,23 +7,35 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 document.addEventListener('DOMContentLoaded', () => {
     const dashboardSection = document.querySelector('.dashboard-section');
     const invoicesSection = document.querySelector('.invoices-section');
+    const estimatesSection = document.querySelector('.estimates-section');
+    const reportsSection = document.querySelector('.reports-section');
     const clientsGrid = document.getElementById('clientsGrid');
     const invoicesGrid = document.getElementById('invoicesGrid');
+    const estimatesGrid = document.getElementById('estimatesGrid');
     const recentInvoicesBody = document.getElementById('recentInvoicesBody');
     const addClientBtn = document.querySelector('.add-client-btn');
     const addInvoiceModal = document.getElementById('addInvoiceModal');
     const addInvoiceForm = document.getElementById('addInvoiceForm');
+    const addEstimateModal = document.getElementById('addEstimateModal');
+    const addEstimateForm = document.getElementById('addEstimateForm');
     const clientForm = document.getElementById('clientForm');
     const itemsTable = document.getElementById('itemsTable');
     const itemRowTemplate = document.getElementById('itemRowTemplate');
+    const estimateItemsTable = document.getElementById('estimateItemsTable');
+    const estimateItemRowTemplate = document.getElementById('estimateItemRowTemplate');
     const addItemBtn = document.getElementById('addItemBtn');
+    const addEstimateItemBtn = document.getElementById('addEstimateItemBtn');
     const toAddress = document.getElementById('toAddress');
+    const toAddressEstimate = document.getElementById('toAddressEstimate');
     const navItems = document.querySelectorAll('.nav-item');
+    const generateReportBtn = document.querySelector('.generate-report-btn');
+    const createEstimateBtn = document.querySelector('.create-estimate-btn');
 
     let selectedClientId = null;
     let currentInvoiceId = null;
+    let currentEstimateId = null;
 
-    // Navigation
+    // Navigation with new Estimates option
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             navItems.forEach(i => i.classList.remove('active'));
@@ -32,11 +44,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (section === 'dashboard') {
                 dashboardSection.style.display = 'block';
                 invoicesSection.style.display = 'none';
+                estimatesSection.style.display = 'none';
+                reportsSection.style.display = 'none';
                 fetchDashboardData();
             } else if (section === 'invoices') {
                 dashboardSection.style.display = 'none';
                 invoicesSection.style.display = 'block';
+                estimatesSection.style.display = 'none';
+                reportsSection.style.display = 'none';
                 fetchAllInvoices();
+            } else if (section === 'estimates') {
+                dashboardSection.style.display = 'none';
+                invoicesSection.style.display = 'none';
+                estimatesSection.style.display = 'block';
+                reportsSection.style.display = 'none';
+                fetchAllEstimates();
+            } else if (section === 'reports') {
+                dashboardSection.style.display = 'none';
+                invoicesSection.style.display = 'none';
+                estimatesSection.style.display = 'none';
+                reportsSection.style.display = 'block';
+                fetchDashboardData(); // Ensure data is loaded for reports
+            } else if (section === 'settings') {
+                $('#settingsModal').modal('show');
             }
         });
     });
@@ -49,10 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .order('invoice_number', { ascending: false })
                 .limit(1);
 
-            if (error) {
-                console.error('Error fetching highest invoice number:', error);
-                throw error;
-            }
+            if (error) throw error;
 
             if (!data || data.length === 0) return 'INV-300';
 
@@ -65,29 +92,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function getNextEstimateNumber() {
+        try {
+            const { data, error } = await supabase
+                .rpc('get_next_estimate_number'); // Use the PostgreSQL function
+
+            if (error) throw error;
+
+            return data;
+        } catch (error) {
+            console.error('Error in getNextEstimateNumber:', error);
+            return 'EST-100';
+        }
+    }
+
     async function fetchDashboardData() {
         try {
-            // Fetch income (sum of paid invoice totals from Supabase)
+            // Fetch income
             const { data: invoices, error: invoiceError } = await supabase
                 .from('invoices')
                 .select('total')
                 .eq('status', 'Paid');
-
             if (invoiceError) throw invoiceError;
-
             const totalIncome = invoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
             document.querySelector('.income-card').textContent = `Income: ₹${totalIncome.toFixed(2)}`;
 
-            // Fetch and display all clients in cards
+            // Fetch client count
             const { data: clients, error: clientError } = await supabase
+                .from('clients')
+                .select('*', { count: 'exact' });
+            if (clientError) throw clientError;
+            document.querySelector('.client-count-card').textContent = `Clients: ${clients.length}`;
+
+            // Fetch invoice status counts
+            const { data: statusCounts, error: statusError } = await supabase
+                .rpc('get_invoice_status_counts');
+            if (statusError) throw statusError;
+            const statusCard = document.querySelector('.status-count-card');
+            statusCard.innerHTML = `
+                <p>Pending: ${statusCounts.find(item => item.status === 'Pending')?.count || 0}</p>
+                <p>Paid: ${statusCounts.find(item => item.status === 'Paid')?.count || 0}</p>
+                <p>Overdue: ${statusCounts.find(item => item.status === 'Overdue')?.count || 0}</p>
+                <p>Cancelled: ${statusCounts.find(item => item.status === 'Cancelled')?.count || 0}</p>
+            `;
+
+            // Fetch and display clients
+            const { data: clientData, error: clientDataError } = await supabase
                 .from('clients')
                 .select('*')
                 .order('name', { ascending: true });
-
-            if (clientError) throw clientError;
+            if (clientDataError) throw clientDataError;
 
             clientsGrid.innerHTML = '';
-            clients.forEach(client => {
+            clientData.forEach(client => {
                 const card = document.createElement('div');
                 card.className = 'client-card';
                 card.innerHTML = `
@@ -95,11 +152,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>Email: ${client.email}</p>
                     <p>Address: ${client.address}</p>
                     <button class="create-invoice-btn" data-client-id="${client.id}">Create Invoice</button>
+                    <button class="create-estimate-btn" data-client-id="${client.id}">Create Estimate</button>
                 `;
                 clientsGrid.appendChild(card);
             });
 
-            // Add event listener for "Create Invoice" buttons
+            // Populate client dropdown in report modal
+            const clientSelect = document.getElementById('client');
+            clientSelect.innerHTML = '<option value="all_clients">All Clients</option>';
+            clientData.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name;
+                clientSelect.appendChild(option);
+            });
+
             document.querySelectorAll('.create-invoice-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     selectedClientId = btn.dataset.clientId;
@@ -108,24 +175,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         .select('*')
                         .eq('id', selectedClientId)
                         .single();
-
                     if (error) throw error;
 
                     toAddress.innerHTML = `To: ${client.name}<br>${client.email}<br>${client.address}`;
                     $('#addInvoiceModal').modal('show');
-                    try {
-                        const nextInvoiceNumber = await getNextInvoiceNumber();
-                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(1)').textContent = `Invoice No.: ${nextInvoiceNumber}`;
-                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(2)').innerHTML = `<strong>Date:</strong> <input type="date" id="date" required style="display: inline; margin-left: 5px;">`;
-                        document.querySelector('#addInvoiceModal .modal-body .col-md-6.text-end p:nth-child(3)').innerHTML = `<strong>Invoice Due:</strong> <input type="date" id="dueDate" required style="display: inline; margin-left: 5px;">`;
-                    } catch (error) {
-                        console.error('Error setting invoice number:', error);
-                    }
+                    const nextInvoiceNumber = await getNextInvoiceNumber();
+                    document.querySelector('#invoiceNumber').textContent = `Invoice No.: ${nextInvoiceNumber}`;
                 });
             });
 
-            // Fetch and display recent invoices
+            document.querySelectorAll('.create-estimate-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    selectedClientId = btn.dataset.clientId;
+                    const { data: client, error } = await supabase
+                        .from('clients')
+                        .select('*')
+                        .eq('id', selectedClientId)
+                        .single();
+                    if (error) throw error;
+
+                    toAddressEstimate.innerHTML = `To: ${client.name}<br>${client.email}<br>${client.address}`;
+                    $('#addEstimateModal').modal('show');
+                    const nextEstimateNumber = await getNextEstimateNumber();
+                    document.querySelector('#estimateNumber').textContent = `Estimate No.: ${nextEstimateNumber}`;
+                });
+            });
+
             await fetchRecentInvoices();
+            await fetchAllEstimates();
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
             clientsGrid.innerHTML = '<div class="client-card text-danger">Failed to load clients: ' + (error.message || 'Unknown error') + '</div>';
@@ -137,8 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: invoices, error } = await supabase
                 .from('invoices')
                 .select('*, clients(name)')
-                .order('invoice_date', { ascending: false })
-                .limit(5); // Show the 5 most recent invoices
+                .order('invoice_number', { ascending: false })
+                .limit(5);
 
             if (error) throw error;
 
@@ -170,13 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 recentInvoicesBody.appendChild(row);
             });
 
-            // Add event listeners for status updates, edit, and view PDF
             document.querySelectorAll('.status-select').forEach(select => {
                 select.addEventListener('change', async (e) => {
                     const invoiceId = e.target.dataset.invoiceId;
                     const newStatus = e.target.value;
                     await updateInvoiceStatus(invoiceId, newStatus);
-                    fetchRecentInvoices(); // Refresh recent invoices
+                    fetchRecentInvoices();
                 });
             });
 
@@ -187,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentInvoiceId = invoiceId;
                         await editInvoice(invoiceId);
                     } else if (e.target.classList.contains('view-pdf')) {
-                        await generateInvoicePDF(invoiceId);
+                        await generateInvoicePDF(invoiceId, 'invoice');
                     }
                 });
             });
@@ -202,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: invoices, error } = await supabase
                 .from('invoices')
                 .select('*, clients(name)')
-                .order('invoice_date', { ascending: false });
+                .order('invoice_number', { ascending: false });
 
             if (error) throw error;
 
@@ -237,13 +313,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 invoicesGrid.appendChild(card);
             });
 
-            // Add event listeners for status updates, edit, and view PDF
             document.querySelectorAll('.status-select').forEach(select => {
                 select.addEventListener('change', async (e) => {
                     const invoiceId = e.target.dataset.invoiceId;
                     const newStatus = e.target.value;
                     await updateInvoiceStatus(invoiceId, newStatus);
-                    fetchAllInvoices(); // Refresh all invoices
+                    fetchAllInvoices();
                 });
             });
 
@@ -254,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentInvoiceId = invoiceId;
                         await editInvoice(invoiceId);
                     } else if (e.target.classList.contains('view-pdf')) {
-                        await generateInvoicePDF(invoiceId);
+                        await generateInvoicePDF(invoiceId, 'invoice');
                     }
                 });
             });
@@ -264,20 +339,94 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchAllEstimates() {
+        try {
+            const { data: estimates, error } = await supabase
+                .from('estimates')
+                .select('*, clients(name)')
+                .order('invoice_number', { ascending: false });
+
+            if (error) throw error;
+
+            estimatesGrid.innerHTML = '';
+            if (!estimates || estimates.length === 0) {
+                estimatesGrid.innerHTML = '<div class="estimate-card">No estimates found</div>';
+                return;
+            }
+
+            estimates.forEach(estimate => {
+                const card = document.createElement('div');
+                card.className = 'estimate-card';
+                card.innerHTML = `
+                    <div class="estimate-details">
+                        <p>Estimate No.: ${estimate.invoice_number}</p>
+                        <p>Client: ${estimate.clients.name}</p>
+                        <p>Date: ${new Date(estimate.invoice_date).toLocaleDateString()}</p>
+                        <p>Status: 
+                            <select class="form-control status-select" data-estimate-id="${estimate.id}">
+                                <option value="Pending" ${estimate.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Accepted" ${estimate.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="Rejected" ${estimate.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                            </select>
+                        </p>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary edit-estimate" data-estimate-id="${estimate.id}">Edit</button>
+                        <button class="btn btn-info view-pdf" data-estimate-id="${estimate.id}">View PDF</button>
+                    </div>
+                `;
+                estimatesGrid.appendChild(card);
+            });
+
+            document.querySelectorAll('.status-select').forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const estimateId = e.target.dataset.estimateId;
+                    const newStatus = e.target.value;
+                    await updateEstimateStatus(estimateId, newStatus);
+                    fetchAllEstimates();
+                });
+            });
+
+            document.querySelectorAll('.edit-estimate, .view-pdf').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const estimateId = e.target.dataset.estimateId;
+                    if (e.target.classList.contains('edit-estimate')) {
+                        currentEstimateId = estimateId;
+                        await editEstimate(estimateId);
+                    } else if (e.target.classList.contains('view-pdf')) {
+                        await generateInvoicePDF(estimateId, 'estimate');
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error fetching estimates:', error);
+            estimatesGrid.innerHTML = '<div class="estimate-card text-danger">Failed to load estimates: ' + (error.message || 'Unknown error') + '</div>';
+        }
+    }
+
     async function updateInvoiceStatus(invoiceId, newStatus) {
         try {
             const { error } = await supabase
                 .from('invoices')
                 .update({ status: newStatus })
                 .eq('id', invoiceId);
-
-            if (error) {
-                console.error('Error updating invoice status:', error);
-                throw error;
-            }
+            if (error) throw error;
         } catch (error) {
             console.error('Failed to update invoice status:', error);
             alert('Failed to update invoice status: ' + (error.message || 'Unknown error'));
+        }
+    }
+
+    async function updateEstimateStatus(estimateId, newStatus) {
+        try {
+            const { error } = await supabase
+                .from('estimates')
+                .update({ status: newStatus })
+                .eq('id', estimateId);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Failed to update estimate status:', error);
+            alert('Failed to update estimate status: ' + (error.message || 'Unknown error'));
         }
     }
 
@@ -289,10 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .eq('id', invoiceId)
                 .single();
 
-            if (error) {
-                console.error('Error fetching invoice:', error);
-                throw error;
-            }
+            if (error) throw error;
 
             const editModal = document.createElement('div');
             editModal.className = 'modal fade';
@@ -363,6 +509,51 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editTaxRate" class="form-label">Tax Rate (%)</label>
+                                            <input type="number" step="0.01" class="form-control" id="editTaxRate" value="${invoice.tax_rate}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editDiscountType" class="form-label">Discount Type</label>
+                                            <select class="form-control" id="editDiscountType">
+                                                <option value="none" ${invoice.discount_type === 'none' ? 'selected' : ''}>None</option>
+                                                <option value="percentage" ${invoice.discount_type === 'percentage' ? 'selected' : ''}>Percentage</option>
+                                                <option value="fixed" ${invoice.discount_type === 'fixed' ? 'selected' : ''}>Fixed Amount</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3" id="editDiscountValueContainer" style="display: ${invoice.discount_type === 'none' ? 'none' : 'block'};">
+                                            <label for="editDiscountValue" class="form-label">Discount Value</label>
+                                            <input type="number" step="0.01" class="form-control" id="editDiscountValue" value="${invoice.discount_value || ''}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editShippingCharge" class="form-label">Shipping Charge (INR)</label>
+                                            <input type="number" step="0.01" class="form-control" id="editShippingCharge" value="${invoice.shipping_charge}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label class="form-label">Is Recurring</label>
+                                            <input type="radio" name="editIsRecurring" value="true" id="editIsRecurringYes" ${invoice.is_recurring ? 'checked' : ''}> Yes
+                                            <input type="radio" name="editIsRecurring" value="false" id="editIsRecurringNo" ${!invoice.is_recurring ? 'checked' : ''}> No
+                                        </div>
+                                        <div class="mb-3" id="editRecurrenceDetails" style="display: ${invoice.is_recurring ? 'block' : 'none'};">
+                                            <label for="editRecurrenceFrequency" class="form-label">Frequency</label>
+                                            <select class="form-control" id="editRecurrenceFrequency">
+                                                <option value="monthly" ${invoice.recurrence_frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
+                                                <option value="quarterly" ${invoice.recurrence_frequency === 'quarterly' ? 'selected' : ''}>Quarterly</option>
+                                                <option value="yearly" ${invoice.recurrence_frequency === 'yearly' ? 'selected' : ''}>Yearly</option>
+                                            </select>
+                                            <label for="editRecurrenceStartDate" class="form-label">Start Date</label>
+                                            <input type="date" class="form-control" id="editRecurrenceStartDate" value="${invoice.recurrence_start_date || ''}">
+                                            <label for="editRecurrenceEndDate" class="form-label">End Date (optional)</label>
+                                            <input type="date" class="form-control" id="editRecurrenceEndDate" value="${invoice.recurrence_end_date || ''}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
                                         <div class="totals-container" id="editTotalsContainer"></div>
                                     </div>
                                 </div>
@@ -415,6 +606,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 editItemsTable.querySelector('tbody').appendChild(newRow);
             });
 
+            // Toggle discount and recurrence fields
+            document.getElementById('editDiscountType').addEventListener('change', (e) => {
+                document.getElementById('editDiscountValueContainer').style.display = e.target.value === 'none' ? 'none' : 'block';
+            });
+            document.querySelectorAll('input[name="editIsRecurring"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    document.getElementById('editRecurrenceDetails').style.display = e.target.value === 'true' ? 'block' : 'none';
+                });
+            });
+
             function updateEditTotals() {
                 let subTotalAmount = 0;
                 document.querySelectorAll('#editItemsTable tbody tr:not(#editItemRowTemplate)').forEach(row => {
@@ -424,21 +625,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
                     subTotalAmount += amount;
                 });
-                
-                const TAX_RATE = 0.09;
-                const cgstAmount = subTotalAmount * TAX_RATE;
-                const sgstAmount = subTotalAmount * TAX_RATE;
-                const taxTotalAmount = cgstAmount + sgstAmount;
-                const totalAmount = subTotalAmount + taxTotalAmount;
-                const balanceAmount = totalAmount;
+
+                const taxRate = parseFloat(document.getElementById('editTaxRate').value) || 0;
+                const discountType = document.getElementById('editDiscountType').value;
+                const discountValue = parseFloat(document.getElementById('editDiscountValue').value) || 0;
+                let discountAmount = 0;
+                if (discountType === 'percentage') discountAmount = subTotalAmount * (discountValue / 100);
+                else if (discountType === 'fixed') discountAmount = discountValue;
+                const discountedSubTotal = subTotalAmount - discountAmount;
+                const taxAmount = discountedSubTotal * (taxRate / 100);
+                const shippingCharge = parseFloat(document.getElementById('editShippingCharge').value) || 0;
+                const totalBeforeShipping = discountedSubTotal + taxAmount;
+                const totalAmount = totalBeforeShipping + shippingCharge;
 
                 editTotalsContainer.innerHTML = `
                     <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
-                    <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR ${cgstAmount.toFixed(2)}</span></div>
-                    <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR ${sgstAmount.toFixed(2)}</span></div>
-                    <div class="total-row"><span class="label">Tax Total:</span><span class="amount">INR ${taxTotalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Discount:</span><span class="amount">${discountType === 'none' ? 'None' : `INR ${discountAmount.toFixed(2)}`}</span></div>
+                    <div class="total-row"><span class="label">Discounted Sub Total:</span><span class="amount">INR ${discountedSubTotal.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Tax (${taxRate}%):</span><span class="amount">INR ${taxAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Total Before Shipping:</span><span class="amount">INR ${totalBeforeShipping.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Shipping Charge:</span><span class="amount">INR ${shippingCharge.toFixed(2)}</span></div>
                     <div class="total-row"><span class="label">Total:</span><span class="amount">INR ${totalAmount.toFixed(2)}</span></div>
-                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${balanceAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${totalAmount.toFixed(2)}</span></div>
                 `;
             }
 
@@ -463,7 +671,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const date = document.getElementById('editDate').value;
                     const dueDate = document.getElementById('editDueDate').value;
-
                     if (!date || !dueDate) {
                         alert('Please ensure both Date and Due Date are selected.');
                         return;
@@ -475,12 +682,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         const description = row.querySelector('.item-description').value;
                         const quantity = row.querySelector('.item-quantity').value;
                         const rate = row.querySelector('.item-rate').value;
-
                         if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
                             allItemsValid = false;
                             return;
                         }
-
                         items.push({
                             description,
                             quantity: parseFloat(quantity),
@@ -494,13 +699,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
+                    const taxRate = parseFloat(document.getElementById('editTaxRate').value) || 0;
+                    const discountType = document.getElementById('editDiscountType').value;
+                    const discountValue = discountType === 'none' ? null : parseFloat(document.getElementById('editDiscountValue').value) || 0;
+                    const shippingCharge = parseFloat(document.getElementById('editShippingCharge').value) || 0;
                     const subTotalAmount = parseFloat(document.querySelector('#editTotalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
-                    const TAX_RATE = 0.09;
-                    const cgstAmount = subTotalAmount * TAX_RATE;
-                    const sgstAmount = subTotalAmount * TAX_RATE;
-                    const taxTotalAmount = cgstAmount + sgstAmount;
-                    const totalAmount = subTotalAmount + taxTotalAmount;
-                    const balanceAmount = totalAmount;
+                    const discountAmount = discountType === 'percentage' ? subTotalAmount * (discountValue / 100) : (discountType === 'fixed' ? discountValue : 0);
+                    const discountedSubTotal = subTotalAmount - discountAmount;
+                    const taxAmount = discountedSubTotal * (taxRate / 100);
+                    const totalBeforeShipping = discountedSubTotal + taxAmount;
+                    const totalAmount = totalBeforeShipping + shippingCharge;
+
+                    const isRecurring = document.querySelector('input[name="editIsRecurring"]:checked').value === 'true';
+                    const recurrenceFrequency = isRecurring ? document.getElementById('editRecurrenceFrequency').value : null;
+                    const recurrenceStartDate = isRecurring ? document.getElementById('editRecurrenceStartDate').value : null;
+                    const recurrenceEndDate = isRecurring ? document.getElementById('editRecurrenceEndDate').value || null : null;
 
                     const { error } = await supabase
                         .from('invoices')
@@ -509,11 +722,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             due_date: dueDate,
                             items,
                             sub_total: subTotalAmount,
-                            cgst: cgstAmount,
-                            sgst: sgstAmount,
-                            tax_total: taxTotalAmount,
+                            tax_rate: taxRate,
+                            discount_type: discountType,
+                            discount_value: discountValue,
+                            shipping_charge: shippingCharge,
                             total: totalAmount,
-                            balance: balanceAmount
+                            balance: totalAmount,
+                            is_recurring: isRecurring,
+                            recurrence_frequency: recurrenceFrequency,
+                            recurrence_start_date: recurrenceStartDate,
+                            recurrence_end_date: recurrenceEndDate
                         })
                         .eq('id', currentInvoiceId);
 
@@ -521,8 +739,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     $('#editInvoiceModal').modal('hide');
                     fetchAllInvoices();
-                    fetchRecentInvoices(); // Refresh recent invoices
-                    document.body.removeChild(editModal); // Clean up the modal
+                    fetchRecentInvoices();
+                    document.body.removeChild(editModal);
                 } catch (error) {
                     console.error('Failed to update invoice:', error);
                     alert('An error occurred while updating the invoice: ' + (error.message || 'Unknown error'));
@@ -536,36 +754,319 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function generateInvoicePDF(invoiceId) {
+    async function editEstimate(estimateId) {
         try {
-            const { data: invoice, error } = await supabase
-                .from('invoices')
+            const { data: estimate, error } = await supabase
+                .from('estimates')
                 .select('*, clients(name, email, address)')
-                .eq('id', invoiceId)
+                .eq('id', estimateId)
                 .single();
 
-            if (error) {
-                console.error('Error fetching invoice for PDF:', error);
-                throw error;
+            if (error) throw error;
+
+            const editModal = document.createElement('div');
+            editModal.className = 'modal fade';
+            editModal.id = 'editEstimateModal';
+            editModal.setAttribute('tabindex', '-1');
+            editModal.setAttribute('aria-labelledby', 'editEstimateModalLabel');
+            editModal.setAttribute('aria-hidden', 'true');
+            editModal.innerHTML = `
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editEstimateModalLabel">Edit Estimate</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editEstimateForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>From:</strong><br>
+                                        Grafikos<br>
+                                        Basement Plot 27, Srinivasa Nagar<br>
+                                        OMR Kottivakkam<br>
+                                        Chennai, Tamilnadu, 600041<br>
+                                        India<br>
+                                        GSTIN: 33AGXPV873G2ZB</p>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <p><strong>Estimate No.: ${estimate.invoice_number}</strong></p>
+                                        <p><strong>Date:</strong> <input type="date" id="editEstimateDate" value="${estimate.invoice_date}" required style="display: inline; margin-left: 5px;"></p>
+                                        <p><strong>Estimate Due:</strong> <input type="date" id="editEstimateDueDate" value="${estimate.due_date}" required style="display: inline; margin-left: 5px;"></p>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editToAddressEstimate" class="form-label">To:</label>
+                                            <div id="editToAddressEstimate">${estimate.clients.name}<br>${estimate.clients.email}<br>${estimate.clients.address}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editEstimateItemsTable" class="form-label">Items</label>
+                                            <table class="table table-bordered" id="editEstimateItemsTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Description</th>
+                                                        <th>Quantity</th>
+                                                        <th>Rate</th>
+                                                        <th>Amount</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr id="editEstimateItemRowTemplate" style="display: none;">
+                                                        <td><input type="text" class="form-control estimate-item-description"></td>
+                                                        <td><input type="number" class="form-control estimate-item-quantity"></td>
+                                                        <td><input type="number" step="0.01" class="form-control estimate-item-rate"></td>
+                                                        <td><span class="estimate-item-amount">INR 0.00</span></td>
+                                                        <td><button type="button" class="btn btn-danger remove-estimate-item">Remove</button></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            <button type="button" class="btn btn-primary mb-3" id="editAddEstimateItemBtn">Add Item</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="editEstimateTaxRate" class="form-label">Tax Rate (%)</label>
+                                            <input type="number" step="0.01" class="form-control" id="editEstimateTaxRate" value="${estimate.tax_rate}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editEstimateDiscountType" class="form-label">Discount Type</label>
+                                            <select class="form-control" id="editEstimateDiscountType">
+                                                <option value="none" ${estimate.discount_type === 'none' ? 'selected' : ''}>None</option>
+                                                <option value="percentage" ${estimate.discount_type === 'percentage' ? 'selected' : ''}>Percentage</option>
+                                                <option value="fixed" ${estimate.discount_type === 'fixed' ? 'selected' : ''}>Fixed Amount</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3" id="editEstimateDiscountValueContainer" style="display: ${estimate.discount_type === 'none' ? 'none' : 'block'};">
+                                            <label for="editEstimateDiscountValue" class="form-label">Discount Value</label>
+                                            <input type="number" step="0.01" class="form-control" id="editEstimateDiscountValue" value="${estimate.discount_value || ''}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editEstimateShippingCharge" class="form-label">Shipping Charge (INR)</label>
+                                            <input type="number" step="0.01" class="form-control" id="editEstimateShippingCharge" value="${estimate.shipping_charge}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="totals-container" id="editEstimateTotalsContainer"></div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col">
+                                        <p><strong>BANK DETAILS:</strong><br>
+                                        GRAFIKOS<br>
+                                        A/C No. 158500202082424,<br>
+                                        Tamilnad Mercantile Bank Ltd,<br>
+                                        Chennai-Thiruvanmiyur Branch,<br>
+                                        IFSC Code: TMBL0000158,<br>
+                                        MICR Code: 600060010.</p>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col text-center">
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(editModal);
+            const editEstimateItemsTable = document.getElementById('editEstimateItemsTable');
+            const editEstimateItemRowTemplate = document.getElementById('editEstimateItemRowTemplate');
+            const editAddEstimateItemBtn = document.getElementById('editAddEstimateItemBtn');
+            const editEstimateTotalsContainer = document.getElementById('editEstimateTotalsContainer');
+            const editEstimateForm = document.getElementById('editEstimateForm');
+
+            // Populate items
+            editEstimateItemsTable.querySelector('tbody').innerHTML = '';
+            estimate.items.forEach(item => {
+                const newRow = editEstimateItemRowTemplate.cloneNode(true);
+                newRow.removeAttribute('id');
+                newRow.style.display = '';
+                newRow.querySelector('.estimate-item-description').value = item.description;
+                newRow.querySelector('.estimate-item-quantity').value = item.quantity;
+                newRow.querySelector('.estimate-item-rate').value = item.rate;
+                newRow.querySelector('.estimate-item-amount').textContent = `INR ${item.amount.toFixed(2)}`;
+                newRow.querySelector('.remove-estimate-item').addEventListener('click', () => {
+                    newRow.remove();
+                    updateEditEstimateTotals();
+                });
+                newRow.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('input', updateEditEstimateTotals);
+                });
+                editEstimateItemsTable.querySelector('tbody').appendChild(newRow);
+            });
+
+            // Toggle discount field
+            document.getElementById('editEstimateDiscountType').addEventListener('change', (e) => {
+                document.getElementById('editEstimateDiscountValueContainer').style.display = e.target.value === 'none' ? 'none' : 'block';
+            });
+
+            function updateEditEstimateTotals() {
+                let subTotalAmount = 0;
+                document.querySelectorAll('#editEstimateItemsTable tbody tr:not(#editEstimateItemRowTemplate)').forEach(row => {
+                    const quantity = parseFloat(row.querySelector('.estimate-item-quantity').value) || 0;
+                    const rate = parseFloat(row.querySelector('.estimate-item-rate').value) || 0;
+                    const amount = quantity * rate;
+                    row.querySelector('.estimate-item-amount').textContent = `INR ${amount.toFixed(2)}`;
+                    subTotalAmount += amount;
+                });
+
+                const taxRate = parseFloat(document.getElementById('editEstimateTaxRate').value) || 0;
+                const discountType = document.getElementById('editEstimateDiscountType').value;
+                const discountValue = parseFloat(document.getElementById('editEstimateDiscountValue').value) || 0;
+                let discountAmount = 0;
+                if (discountType === 'percentage') discountAmount = subTotalAmount * (discountValue / 100);
+                else if (discountType === 'fixed') discountAmount = discountValue;
+                const discountedSubTotal = subTotalAmount - discountAmount;
+                const taxAmount = discountedSubTotal * (taxRate / 100);
+                const shippingCharge = parseFloat(document.getElementById('editEstimateShippingCharge').value) || 0;
+                const totalBeforeShipping = discountedSubTotal + taxAmount;
+                const totalAmount = totalBeforeShipping + shippingCharge;
+
+                editEstimateTotalsContainer.innerHTML = `
+                    <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Discount:</span><span class="amount">${discountType === 'none' ? 'None' : `INR ${discountAmount.toFixed(2)}`}</span></div>
+                    <div class="total-row"><span class="label">Discounted Sub Total:</span><span class="amount">INR ${discountedSubTotal.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Tax (${taxRate}%):</span><span class="amount">INR ${taxAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Total Before Shipping:</span><span class="amount">INR ${totalBeforeShipping.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Shipping Charge:</span><span class="amount">INR ${shippingCharge.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Total:</span><span class="amount">INR ${totalAmount.toFixed(2)}</span></div>
+                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${totalAmount.toFixed(2)}</span></div>
+                `;
             }
 
-            const subTotalAmount = invoice.items.reduce((sum, item) => sum + item.amount, 0);
-            const TAX_RATE = 0.09;
-            const cgstAmount = subTotalAmount * TAX_RATE;
-            const sgstAmount = subTotalAmount * TAX_RATE;
-            const taxTotalAmount = cgstAmount + sgstAmount;
-            const totalAmount = subTotalAmount + taxTotalAmount;
+            updateEditEstimateTotals();
+
+            editAddEstimateItemBtn.addEventListener('click', () => {
+                const newRow = editEstimateItemRowTemplate.cloneNode(true);
+                newRow.removeAttribute('id');
+                newRow.style.display = '';
+                newRow.querySelector('.remove-estimate-item').addEventListener('click', () => {
+                    newRow.remove();
+                    updateEditEstimateTotals();
+                });
+                newRow.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('input', updateEditEstimateTotals);
+                });
+                editEstimateItemsTable.querySelector('tbody').appendChild(newRow);
+            });
+
+            editEstimateForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                try {
+                    const date = document.getElementById('editEstimateDate').value;
+                    const dueDate = document.getElementById('editEstimateDueDate').value;
+                    if (!date || !dueDate) {
+                        alert('Please ensure both Date and Due Date are selected.');
+                        return;
+                    }
+
+                    let items = [];
+                    let allItemsValid = true;
+                    document.querySelectorAll('#editEstimateItemsTable tbody tr:not(#editEstimateItemRowTemplate)').forEach(row => {
+                        const description = row.querySelector('.estimate-item-description').value;
+                        const quantity = row.querySelector('.estimate-item-quantity').value;
+                        const rate = row.querySelector('.estimate-item-rate').value;
+                        if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
+                            allItemsValid = false;
+                            return;
+                        }
+                        items.push({
+                            description,
+                            quantity: parseFloat(quantity),
+                            rate: parseFloat(rate),
+                            amount: parseFloat(row.querySelector('.estimate-item-amount').textContent.replace('INR ', ''))
+                        });
+                    });
+
+                    if (!allItemsValid || items.length === 0) {
+                        alert('Please ensure all item fields are correctly filled out.');
+                        return;
+                    }
+
+                    const taxRate = parseFloat(document.getElementById('editEstimateTaxRate').value) || 0;
+                    const discountType = document.getElementById('editEstimateDiscountType').value;
+                    const discountValue = discountType === 'none' ? null : parseFloat(document.getElementById('editEstimateDiscountValue').value) || 0;
+                    const shippingCharge = parseFloat(document.getElementById('editEstimateShippingCharge').value) || 0;
+                    const subTotalAmount = parseFloat(document.querySelector('#editEstimateTotalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
+                    const discountAmount = discountType === 'percentage' ? subTotalAmount * (discountValue / 100) : (discountType === 'fixed' ? discountValue : 0);
+                    const discountedSubTotal = subTotalAmount - discountAmount;
+                    const taxAmount = discountedSubTotal * (taxRate / 100);
+                    const totalBeforeShipping = discountedSubTotal + taxAmount;
+                    const totalAmount = totalBeforeShipping + shippingCharge;
+
+                    const { error } = await supabase
+                        .from('estimates')
+                        .update({
+                            invoice_date: date,
+                            due_date: dueDate,
+                            items,
+                            sub_total: subTotalAmount,
+                            tax_rate: taxRate,
+                            discount_type: discountType,
+                            discount_value: discountValue,
+                            shipping_charge: shippingCharge,
+                            total: totalAmount,
+                            balance: totalAmount
+                        })
+                        .eq('id', currentEstimateId);
+
+                    if (error) throw error;
+
+                    $('#editEstimateModal').modal('hide');
+                    fetchAllEstimates();
+                    document.body.removeChild(editModal);
+                } catch (error) {
+                    console.error('Failed to update estimate:', error);
+                    alert('An error occurred while updating the estimate: ' + (error.message || 'Unknown error'));
+                }
+            });
+
+            $('#editEstimateModal').modal('show');
+        } catch (error) {
+            console.error('Failed to fetch estimate for editing:', error);
+            alert('Failed to fetch estimate details: ' + (error.message || 'Unknown error'));
+        }
+    }
+
+    async function generateInvoicePDF(id, type) {
+        try {
+            const table = type === 'invoice' ? 'invoices' : 'estimates';
+            const { data: documentData, error } = await supabase
+                .from(table)
+                .select('*, clients(name, email, address)')
+                .eq('id', id)
+                .single();
+            if (error) throw error;
+
+            const { data: settings } = await supabase.from('settings').select('logo_path').single();
+            const subTotalAmount = documentData.items.reduce((sum, item) => sum + item.amount, 0);
+            const discountAmount = documentData.discount_type === 'percentage' ? subTotalAmount * (documentData.discount_value / 100) : (documentData.discount_type === 'fixed' ? documentData.discount_value : 0);
+            const discountedSubTotal = subTotalAmount - discountAmount;
+            const taxAmount = discountedSubTotal * (documentData.tax_rate / 100);
+            const totalBeforeShipping = discountedSubTotal + taxAmount;
+            const totalAmount = totalBeforeShipping + documentData.shipping_charge;
 
             const docDefinition = {
                 content: [
+                    settings.logo_path ? { image: settings.logo_path, width: 150, margin: [0, 0, 0, 20] } : { text: 'Grafikos', style: 'header' },
                     {
                         columns: [
-                            { text: 'Invoice', style: 'header' },
-                            {
-                                text: 'GRAFIKOS - Cos we create',
-                                style: 'companyName',
-                                alignment: 'right'
-                            }
+                            { text: `${type.charAt(0).toUpperCase() + type.slice(1)}`, style: 'header' },
+                            { text: 'GRAFIKOS - Cos we create', style: 'companyName', alignment: 'right' }
                         ],
                         margin: [0, 0, 0, 20]
                     },
@@ -581,9 +1082,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 'GSTIN: 33AGXPV873G2ZB'
                             ],
                             [
-                                { text: `Invoice No.: ${invoice.invoice_number}`, bold: true },
-                                { text: `Date: ${new Date(invoice.invoice_date).toLocaleDateString()}`, bold: true },
-                                { text: `Invoice Due: ${new Date(invoice.due_date).toLocaleDateString()}`, bold: true }
+                                { text: `${type.charAt(0).toUpperCase() + type.slice(1)} No.: ${documentData.invoice_number}`, bold: true },
+                                { text: `Date: ${new Date(documentData.invoice_date).toLocaleDateString()}`, bold: true },
+                                { text: `${type.charAt(0).toUpperCase() + type.slice(1)} Due: ${new Date(documentData.due_date).toLocaleDateString()}`, bold: true }
                             ]
                         ],
                         columnGap: 20,
@@ -591,9 +1092,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     {
                         ul: [
-                            { text: `To: ${invoice.clients.name}`, bold: true },
-                            { text: invoice.clients.email },
-                            { text: invoice.clients.address }
+                            { text: `To: ${documentData.clients.name}`, bold: true },
+                            { text: documentData.clients.email },
+                            { text: documentData.clients.address }
                         ],
                         style: 'clientInfo',
                         margin: [0, 0, 0, 20]
@@ -609,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     { text: 'Rate', bold: true, alignment: 'right' },
                                     { text: 'Amount', bold: true, alignment: 'right' }
                                 ],
-                                ...invoice.items.map(item => [
+                                ...documentData.items.map(item => [
                                     item.description,
                                     { text: item.quantity, alignment: 'center' },
                                     { text: `INR ${item.rate.toFixed(2)}`, alignment: 'right' },
@@ -624,9 +1125,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             widths: ['*', 'auto'],
                             body: [
                                 [{ text: 'Sub Total:', bold: true, alignment: 'left' }, { text: `INR ${subTotalAmount.toFixed(2)}`, alignment: 'right' }],
-                                [{ text: 'CGST (9%):', bold: true, alignment: 'left' }, { text: `INR ${cgstAmount.toFixed(2)}`, alignment: 'right' }],
-                                [{ text: 'SGST (9%):', bold: true, alignment: 'left' }, { text: `INR ${sgstAmount.toFixed(2)}`, alignment: 'right' }],
-                                [{ text: 'Tax Total:', bold: true, alignment: 'left' }, { text: `INR ${taxTotalAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: `Discount (${documentData.discount_type === 'percentage' ? `${documentData.discount_value}%` : documentData.discount_type}):`, bold: true, alignment: 'left' }, { text: `INR ${discountAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'Discounted Sub Total:', bold: true, alignment: 'left' }, { text: `INR ${discountedSubTotal.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: `Tax (${documentData.tax_rate}%):`, bold: true, alignment: 'left' }, { text: `INR ${taxAmount.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'Total Before Shipping:', bold: true, alignment: 'left' }, { text: `INR ${totalBeforeShipping.toFixed(2)}`, alignment: 'right' }],
+                                [{ text: 'Shipping Charge:', bold: true, alignment: 'left' }, { text: `INR ${documentData.shipping_charge.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'Total:', bold: true, alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }],
                                 [{ text: 'Balance:', bold: true, color: 'red', alignment: 'left' }, { text: `INR ${totalAmount.toFixed(2)}`, alignment: 'right' }]
                             ]
@@ -665,132 +1168,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             pdfMake.createPdf(docDefinition).open();
         } catch (error) {
-            console.error('Failed to fetch invoice for PDF:', error);
-            alert('Failed to fetch invoice details: ' + (error.message || 'Unknown error'));
+            console.error(`Failed to fetch ${type} for PDF:`, error);
+            alert(`Failed to fetch ${type} details: ' + (error.message || 'Unknown error')`);
         }
     }
-
-    function addItemRow() {
-        const newRow = itemRowTemplate.cloneNode(true);
-        newRow.removeAttribute('id');
-        newRow.style.display = '';
-        newRow.querySelector('.remove-item').addEventListener('click', () => {
-            newRow.remove();
-            updateTotals();
-        });
-        newRow.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', updateTotals);
-        });
-        itemsTable.querySelector('tbody').appendChild(newRow);
-    }
-
-    function updateTotals() {
-        let subTotalAmount = 0;
-        document.querySelectorAll('#itemsTable tbody tr:not(#itemRowTemplate)').forEach(row => {
-            const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
-            const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
-            const amount = quantity * rate;
-            row.querySelector('.item-amount').textContent = `INR ${amount.toFixed(2)}`;
-            subTotalAmount += amount;
-        });
-        
-        const TAX_RATE = 0.09;
-        const cgstAmount = subTotalAmount * TAX_RATE;
-        const sgstAmount = subTotalAmount * TAX_RATE;
-        const taxTotalAmount = cgstAmount + sgstAmount;
-        const totalAmount = subTotalAmount + taxTotalAmount;
-        const balanceAmount = totalAmount;
-
-        const totalsContainer = document.querySelector('#totalsContainer');
-        totalsContainer.innerHTML = `
-            <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
-            <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR ${cgstAmount.toFixed(2)}</span></div>
-            <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR ${sgstAmount.toFixed(2)}</span></div>
-            <div class="total-row"><span class="label">Tax Total:</span><span class="amount">INR ${taxTotalAmount.toFixed(2)}</span></div>
-            <div class="total-row"><span class="label">Total:</span><span class="amount">INR ${totalAmount.toFixed(2)}</span></div>
-            <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${balanceAmount.toFixed(2)}</span></div>
-        `;
-    }
-
-    addItemBtn.addEventListener('click', addItemRow);
-
-    addInvoiceForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        try {
-            const date = document.getElementById('date').value;
-            const dueDate = document.getElementById('dueDate').value;
-            
-            if (!date || !dueDate) {
-                alert('Please ensure both Date and Due Date are selected.');
-                return;
-            }
-        
-            let items = [];
-            let allItemsValid = true;
-            document.querySelectorAll('#itemsTable tbody tr:not(#itemRowTemplate)').forEach(row => {
-                const description = row.querySelector('.item-description').value;
-                const quantity = row.querySelector('.item-quantity').value;
-                const rate = row.querySelector('.item-rate').value;
-                
-                if (!description || !quantity || !rate || isNaN(parseFloat(quantity)) || isNaN(parseFloat(rate)) || parseFloat(quantity) <= 0 || parseFloat(rate) <= 0) {
-                    allItemsValid = false;
-                    return;
-                }
-                
-                items.push({
-                    description,
-                    quantity: parseFloat(quantity),
-                    rate: parseFloat(rate),
-                    amount: parseFloat(row.querySelector('.item-amount').textContent.replace('INR ', ''))
-                });
-            });
-        
-            if (!allItemsValid || items.length === 0) {
-                alert('Please ensure all item fields are correctly filled out.');
-                return;
-            }
-        
-            if (!selectedClientId) {
-                alert('Please select a client before submitting the invoice.');
-                return;
-            }
-
-            const invoiceNumber = await getNextInvoiceNumber();
-            const subTotalAmount = parseFloat(document.querySelector('#totalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
-            const TAX_RATE = 0.09;
-            const cgstAmount = subTotalAmount * TAX_RATE;
-            const sgstAmount = subTotalAmount * TAX_RATE;
-            const taxTotalAmount = cgstAmount + sgstAmount;
-            const totalAmount = subTotalAmount + taxTotalAmount;
-            const balanceAmount = totalAmount;
-
-            const { error } = await supabase
-                .from('invoices')
-                .insert([{
-                    client_id: selectedClientId,
-                    invoice_number: invoiceNumber,
-                    invoice_date: date,
-                    due_date: dueDate,
-                    items,
-                    sub_total: subTotalAmount,
-                    cgst: cgstAmount,
-                    sgst: sgstAmount,
-                    tax_total: taxTotalAmount,
-                    total: totalAmount,
-                    balance: balanceAmount,
-                    status: 'Pending'
-                }]);
-
-            if (error) throw error;
-
-            $('#addInvoiceModal').modal('hide');
-            fetchAllInvoices();
-            fetchRecentInvoices(); // Refresh recent invoices after adding
-        } catch (error) {
-            console.error('Failed to add invoice:', error);
-            alert('An error occurred while adding the invoice: ' + (error.message || 'Unknown error'));
-        }
-    });
 
     // Add Client functionality
     addClientBtn.addEventListener('click', () => $('#addClientModal').modal('show'));
@@ -801,7 +1182,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const clientNameInput = document.getElementById('clientName');
             const clientEmailInput = document.getElementById('clientEmail');
             const clientAddressInput = document.getElementById('clientAddress');
-            
             const name = clientNameInput.value.trim();
             const email = clientEmailInput.value.trim();
             const address = clientAddressInput.value.trim();
@@ -814,13 +1194,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const { error } = await supabase
                 .from('clients')
                 .insert([{ name, email, address }]);
+            if (error) throw error;
 
-            if (error) {
-                console.error('Error adding client:', error);
-                throw error;
-            }
-
-            await fetchDashboardData(); // Refresh clients
+            await fetchDashboardData();
             clientNameInput.value = '';
             clientEmailInput.value = '';
             clientAddressInput.value = '';
@@ -831,11 +1207,167 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Settings form submission for logo upload
+    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const fileInput = document.getElementById('logoUpload');
+            const file = fileInput.files[0];
+            if (file) {
+                const { data, error } = await supabase
+                    .storage
+                    .from('logos')
+                    .upload('logo.png', file, { upsert: true });
+                if (error) throw error;
+                const logoUrl = supabase.storage.from('logos').getPublicUrl(data.path).data.publicUrl;
+                await supabase.from('settings').update({ logo_path: logoUrl }).eq('id', 1);
+                document.querySelector('.logo').src = logoUrl;
+                $('#settingsModal').modal('hide');
+            }
+        } catch (error) {
+            console.error('Failed to upload logo:', error);
+            alert('Failed to upload logo: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    // New: Handle report generation
+    generateReportBtn.addEventListener('click', () => {
+        $('#generateReportModal').modal('show');
+    });
+
+    // New: Toggle custom period fields
+    document.getElementById('period').addEventListener('change', (e) => {
+        const customPeriod = document.getElementById('customPeriod');
+        customPeriod.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+
+    document.getElementById('reportForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const reportType = document.getElementById('reportType').value;
+            const period = document.getElementById('period').value;
+            const status = document.getElementById('status').value;
+            const currency = document.getElementById('currency').value;
+            const clientId = document.getElementById('client').value;
+
+            let query = supabase.from(reportType === 'invoices' ? 'invoices' : 'estimates')
+                .select('*')
+                .order('invoice_number', { ascending: false });
+
+            // Apply period filter
+            if (period !== 'all_time') {
+                const now = new Date();
+                let startDate, endDate;
+                if (period === 'this_month') {
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                } else if (period === 'last_month') {
+                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                } else if (period === 'custom') {
+                    startDate = new Date(document.getElementById('startDate').value);
+                    endDate = new Date(document.getElementById('endDate').value);
+                }
+                query = query.gte('invoice_date', startDate.toISOString().split('T')[0])
+                    .lte('invoice_date', endDate.toISOString().split('T')[0]);
+            }
+
+            // Apply status filter
+            if (status !== 'all') {
+                query = query.eq('status', status);
+            }
+
+            // Apply client filter
+            if (clientId !== 'all_clients') {
+                query = query.eq('client_id', clientId);
+            }
+
+            const { data: reportData, error } = await query;
+            if (error) throw error;
+
+            // Generate PDF report
+            await generateReportPDF(reportData, reportType, period, status, currency, clientId);
+            $('#generateReportModal').modal('hide');
+        } catch (error) {
+            console.error('Failed to generate report:', error);
+            alert('Failed to generate report: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    async function generateReportPDF(data, reportType, period, status, currency, clientId) {
+        const currencySymbols = {
+            'inr': '₹',
+            'usd': '$',
+            'pound': '£'
+        };
+        const symbol = currencySymbols[currency] || '₹';
+
+        const { data: settings } = await supabase.from('settings').select('logo_path').single();
+        const docDefinition = {
+            content: [
+                settings.logo_path ? { image: settings.logo_path, width: 150, margin: [0, 0, 0, 20] } : { text: 'Grafikos', style: 'header' },
+                {
+                    text: `Report - ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`,
+                    style: 'header',
+                    margin: [0, 0, 0, 20]
+                },
+                {
+                    text: `Filters: Period: ${period === 'custom' ? `From ${new Date(document.getElementById('startDate').value).toLocaleDateString()} to ${new Date(document.getElementById('endDate').value).toLocaleDateString()}` : period}, Status: ${status}, Currency: ${currency}, Client: ${clientId === 'all_clients' ? 'All Clients' : data[0]?.clients?.name || 'N/A'}`,
+                    style: 'subheader',
+                    margin: [0, 0, 0, 10]
+                },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['auto', '*', 'auto', 'auto', 'auto'],
+                        body: [
+                            [
+                                { text: 'ID', bold: true, alignment: 'left' },
+                                { text: 'Client', bold: true, alignment: 'left' },
+                                { text: 'Date', bold: true, alignment: 'center' },
+                                { text: 'Status', bold: true, alignment: 'center' },
+                                { text: 'Total', bold: true, alignment: 'right' }
+                            ],
+                            ...data.map(item => [
+                                item.invoice_number || 'N/A',
+                                item.clients?.name || 'N/A',
+                                new Date(item.invoice_date).toLocaleDateString(),
+                                item.status || 'N/A',
+                                { text: `${symbol}${item.total?.toFixed(2) || '0.00'}`, alignment: 'right' }
+                            ])
+                        ]
+                    },
+                    margin: [0, 0, 0, 20]
+                },
+                {
+                    text: 'Generated on: ' + new Date().toLocaleDateString(),
+                    style: 'footer',
+                    alignment: 'right',
+                    margin: [0, 20, 0, 0]
+                }
+            ],
+            styles: {
+                header: { fontSize: 24, bold: true, color: '#333' },
+                companyName: { fontSize: 14, bold: true, color: '#0066cc' },
+                subheader: { fontSize: 14, color: '#4a5568' },
+                footer: { fontSize: 10, color: '#666' }
+            },
+            defaultStyle: {
+                fontSize: 12,
+                color: '#000'
+            }
+        };
+
+        pdfMake.createPdf(docDefinition).open();
+    }
+
     // Initialize with Dashboard view
     async function initialize() {
         try {
             dashboardSection.style.display = 'block';
             invoicesSection.style.display = 'none';
+            estimatesSection.style.display = 'none';
+            reportsSection.style.display = 'none';
             await fetchDashboardData();
         } catch (error) {
             console.error('Initialization error:', error);
