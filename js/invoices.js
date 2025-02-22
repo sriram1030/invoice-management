@@ -227,7 +227,14 @@ export async function editInvoice(invoiceId) {
                             </div>
                             <div class="row mt-3">
                                 <div class="col-md-12">
-                                    <div class="totals-container" id="editTotalsContainer"></div>
+                                    <div class="totals-container">
+                                        <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR 0.00</span></div>
+                                        <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                        <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                        <div class="total-row"><span class="label">Total Tax:</span><span class="amount">INR 0.00</span></div>
+                                        <div class="total-row"><span class="label">Total:</span><span class="amount">INR 0.00</span></div>
+                                        <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR 0.00</span></div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="row mt-3">
@@ -258,7 +265,7 @@ export async function editInvoice(invoiceId) {
         const editItemsTable = document.getElementById('editItemsTable');
         const editItemRowTemplate = document.getElementById('editItemRowTemplate');
         const editAddItemBtn = document.getElementById('editAddItemBtn');
-        const editTotalsContainer = document.getElementById('editTotalsContainer');
+        const editTotalsContainer = document.querySelector('#editInvoiceModal .totals-container');
         const editInvoiceForm = document.getElementById('editInvoiceForm');
 
         // Populate client list in edit modal
@@ -446,7 +453,7 @@ export async function editInvoice(invoiceId) {
                     return;
                 }
 
-                const subTotalAmount = parseFloat(document.querySelector('#editTotalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
+                const subTotalAmount = parseFloat(document.querySelector('#editInvoiceModal .totals-container .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
                 const cgstRate = 9; // Fixed CGST rate of 9%
                 const sgstRate = 9; // Fixed SGST rate of 9%
                 const cgstAmount = subTotalAmount * (cgstRate / 100);
@@ -528,7 +535,7 @@ export function updateTotals() {
     const taxTotal = cgstAmount + sgstAmount; // Total tax (CGST + SGST)
     const totalAmount = subTotalAmount + taxTotal;
 
-    const totalsContainer = document.querySelector('#totalsContainer');
+    const totalsContainer = document.querySelector('#addInvoiceModal .totals-container');
     if (totalsContainer) {
         totalsContainer.innerHTML = `
             <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR ${subTotalAmount.toFixed(2)}</span></div>
@@ -539,7 +546,7 @@ export function updateTotals() {
             <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR ${totalAmount.toFixed(2)}</span></div>
         `;
     } else {
-        console.error('totalsContainer not found in DOM');
+        console.error('totalsContainer not found in DOM for add invoice modal');
     }
 }
 
@@ -603,7 +610,7 @@ export function addInvoiceFormSubmit() {
                     return;
                 }
 
-                const subTotalAmount = parseFloat(document.querySelector('#totalsContainer .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
+                const subTotalAmount = parseFloat(document.querySelector('#addInvoiceModal .totals-container .total-row:first-child .amount').textContent.replace('INR ', '')) || 0;
                 const cgstRate = 9; // Fixed CGST rate of 9%
                 const sgstRate = 9; // Fixed SGST rate of 9%
                 const cgstAmount = subTotalAmount * (cgstRate / 100);
@@ -645,7 +652,6 @@ export function addInvoiceFormSubmit() {
     }
 }
 
-// Function to populate the client filter dropdown
 export async function populateClientFilter() {
     try {
         const { data: clients, error } = await supabase
@@ -674,7 +680,6 @@ export async function populateClientFilter() {
     }
 }
 
-// Function to apply filters and refresh the table
 export function setupInvoiceFilters() {
     if (searchInvoiceId && filterClient && filterStatus) {
         const applyFilters = () => {

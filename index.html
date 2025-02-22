@@ -171,7 +171,7 @@
         </section>
     </main>
 
-    <!-- Modal for Adding Client -->
+    <!-- Modal for Adding/Editing Client -->
     <div class="modal fade" id="addClientModal" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-md">
             <div class="modal-content">
@@ -181,6 +181,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="clientForm">
+                        <input type="hidden" id="clientId" name="clientId"> <!-- Hidden field for client ID during editing -->
                         <div class="mb-3">
                             <label for="clientName" class="form-label">Client Name</label>
                             <input type="text" class="form-control" id="clientName" required>
@@ -193,7 +194,7 @@
                             <label for="clientAddress" class="form-label">Client Address</label>
                             <textarea class="form-control" id="clientAddress" rows="3" required></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Add Client</button>
+                        <button type="submit" class="btn btn-primary" id="clientSubmitBtn">Add Client</button>
                     </form>
                 </div>
             </div>
@@ -275,7 +276,14 @@
                         </div>
                         <div class="row mt-3">
                             <div class="col-md-12">
-                                <div class="totals-container" id="totalsContainer"></div>
+                                <div class="totals-container">
+                                    <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Total Tax:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Total:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR 0.00</span></div>
+                                </div>
                             </div>
                         </div>
                         <div class="row mt-3">
@@ -292,6 +300,113 @@
                         <div class="row mt-3">
                             <div class="col text-center">
                                 <button type="submit" class="btn btn-primary">Submit Invoice</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Editing Invoice (Dynamic) -->
+    <div class="modal fade" id="editInvoiceModal" tabindex="-1" aria-labelledby="editInvoiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editInvoiceModalLabel">Edit Invoice</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editInvoiceForm" novalidate>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>From:</strong><br>
+                                Grafikos<br>
+                                Basement Plot 27, Srinivasa Nagar<br>
+                                OMR Kottivakkam<br>
+                                Chennai, Tamilnadu, 600041<br>
+                                India<br>
+                                GSTIN: 33AGXPV873G2ZB</p>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <p><strong id="editInvoiceNumber">Invoice No.: Auto Generated</strong></p>
+                                <p><strong>Date:</strong> <input type="date" id="editDate" required style="display: inline; margin-left: 5px;"></p>
+                                <p><strong>Invoice Due:</strong> <input type="date" id="editDueDate" required style="display: inline; margin-left: 5px;"></p>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="editClientSelect" class="form-label">Select Client</label>
+                                    <select class="form-control" id="editClientSelect" required>
+                                        <option value="">Select a Client</option>
+                                        <!-- Options will be populated dynamically via JavaScript -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="mb-3" id="editClientDetails" style="display: none;">
+                                    <label for="editToAddress" class="form-label">To:</label>
+                                    <div id="editToAddress"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="editItemsTable" class="form-label">Items</label>
+                                    <table class="table table-bordered" id="editItemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th>Quantity</th>
+                                                <th>Rate</th>
+                                                <th>Amount</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr id="editItemRowTemplate" style="display: none;">
+                                                <td><input type="text" class="form-control item-description" required></td>
+                                                <td><input type="number" class="form-control item-quantity" required></td>
+                                                <td><input type="number" step="0.01" class="form-control item-rate" required></td>
+                                                <td><span class="item-amount">INR 0.00</span></td>
+                                                <td><button type="button" class="btn btn-danger remove-item">Remove</button></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn btn-primary mb-3" id="editAddItemBtn">Add Item</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="totals-container">
+                                    <div class="total-row"><span class="label">Sub Total:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">CGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">SGST (9%):</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Total Tax:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Total:</span><span class="amount">INR 0.00</span></div>
+                                    <div class="total-row"><span class="label">Balance:</span><span class="amount red">INR 0.00</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col">
+                                <p><strong>BANK DETAILS:</strong><br>
+                                GRAFIKOS<br>
+                                A/C No. 158500202082424,<br>
+                                Tamilnad Mercantile Bank Ltd,<br>
+                                Chennai-Thiruvanmiyur Branch,<br>
+                                IFSC Code: TMBL0000158,<br>
+                                MICR Code: 600060010.</p>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col text-center">
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
                             </div>
                         </div>
                     </form>

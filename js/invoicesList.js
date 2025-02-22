@@ -126,7 +126,7 @@ export async function fetchDashboardData() {
 export async function fetchInvoicesList() {
     console.log('Fetching invoices list...');
     try {
-        // Fetch recent invoices for the Invoices menu
+        // Fetch recent invoices for the Invoices menu with filters
         await fetchRecentInvoices();
 
         // This function can be expanded later to fetch all invoices or other lists if needed
@@ -212,11 +212,20 @@ async function editClient(clientId) {
         const clientNameInput = document.getElementById('clientName');
         const clientEmailInput = document.getElementById('clientEmail');
         const clientAddressInput = document.getElementById('clientAddress');
+        const clientIdInput = document.getElementById('clientId');
+        const modalTitle = document.getElementById('addClientModalLabel');
+        const submitBtn = document.getElementById('clientSubmitBtn');
 
-        if (clientNameInput && clientEmailInput && clientAddressInput) {
+        if (clientNameInput && clientEmailInput && clientAddressInput && clientIdInput && modalTitle && submitBtn) {
+            // Set the client details for editing
             clientNameInput.value = client.name;
             clientEmailInput.value = client.email;
             clientAddressInput.value = client.address;
+            clientIdInput.value = client.id; // Set the client ID for the update
+
+            // Update modal title and button text for editing
+            modalTitle.textContent = 'Edit Client';
+            submitBtn.textContent = 'Update Client';
 
             // Show the modal
             $('#addClientModal').modal('show');
@@ -224,7 +233,8 @@ async function editClient(clientId) {
             // Update the form submission to handle editing
             const clientForm = document.getElementById('clientForm');
             if (clientForm) {
-                clientForm.addEventListener('submit', async (e) => {
+                clientForm.removeEventListener('submit', clientForm._originalSubmit); // Remove any previous listeners
+                clientForm._originalSubmit = async (e) => {
                     e.preventDefault();
                     try {
                         const name = clientNameInput.value.trim();
@@ -250,12 +260,24 @@ async function editClient(clientId) {
                         console.error('Failed to update client:', error);
                         alert('An error occurred while updating the client: ' + (error.message || 'Unknown error'));
                     }
-                }, { once: true }); // Ensure the submit listener is only added once per modal show
+                };
+                clientForm.addEventListener('submit', clientForm._originalSubmit, { once: true }); // Add new listener once
+
+                // Reset modal if closed without submitting
+                $('#addClientModal').on('hidden.bs.modal', () => {
+                    modalTitle.textContent = 'Add Client';
+                    submitBtn.textContent = 'Add Client';
+                    clientNameInput.value = '';
+                    clientEmailInput.value = '';
+                    clientAddressInput.value = '';
+                    clientIdInput.value = ''; // Clear client ID
+                    clientForm.removeEventListener('submit', clientForm._originalSubmit); // Clean up listener
+                });
             } else {
                 console.error('clientForm not found in DOM');
             }
         } else {
-            console.error('Client inputs not found in DOM');
+            console.error('Client inputs, title, or button not found in DOM');
         }
     } catch (error) {
         console.error('Failed to fetch client for editing:', error);

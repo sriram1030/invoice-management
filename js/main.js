@@ -28,9 +28,9 @@ export const toAddress = document.getElementById('toAddress');
 export const navItems = document.querySelectorAll('.nav-item');
 export const clientSelect = document.getElementById('clientSelect');
 export const clientDetails = document.getElementById('clientDetails');
-export const searchInvoiceId = document.querySelector('.search-invoice-id'); // New filter element
-export const filterClient = document.querySelector('.filter-client'); // New filter element
-export const filterStatus = document.querySelector('.filter-status'); // New filter element
+export const searchInvoiceId = document.querySelector('.search-invoice-id');
+export const filterClient = document.querySelector('.filter-client');
+export const filterStatus = document.querySelector('.filter-status');
 
 export let selectedClientId = null;
 
@@ -73,7 +73,24 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add client functionality
         if (addClientBtn) {
             console.log('Setting up addClientBtn');
-            addClientBtn.addEventListener('click', () => $('#addClientModal').modal('show'));
+            addClientBtn.addEventListener('click', () => {
+                const modalTitle = document.getElementById('addClientModalLabel');
+                const submitBtn = document.getElementById('clientSubmitBtn');
+                const clientIdInput = document.getElementById('clientId');
+                const clientNameInput = document.getElementById('clientName');
+                const clientEmailInput = document.getElementById('clientEmail');
+                const clientAddressInput = document.getElementById('clientAddress');
+
+                if (modalTitle && submitBtn && clientIdInput && clientNameInput && clientEmailInput && clientAddressInput) {
+                    modalTitle.textContent = 'Add Client';
+                    submitBtn.textContent = 'Add Client';
+                    clientIdInput.value = ''; // Clear client ID for adding
+                    clientNameInput.value = '';
+                    clientEmailInput.value = '';
+                    clientAddressInput.value = '';
+                }
+                $('#addClientModal').modal('show');
+            });
         }
 
         if (clientForm) {
@@ -81,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clientForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 try {
+                    const clientIdInput = document.getElementById('clientId');
                     const clientNameInput = document.getElementById('clientName');
                     const clientEmailInput = document.getElementById('clientEmail');
                     const clientAddressInput = document.getElementById('clientAddress');
@@ -93,21 +111,32 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
-                    const { error } = await supabase
-                        .from('clients')
-                        .insert([{ name, email, address }]);
-                    if (error) throw error;
+                    if (clientIdInput.value) {
+                        // Update existing client
+                        const { error: updateError } = await supabase
+                            .from('clients')
+                            .update({ name, email, address })
+                            .eq('id', clientIdInput.value);
+                        if (updateError) throw updateError;
+                    } else {
+                        // Add new client
+                        const { error } = await supabase
+                            .from('clients')
+                            .insert([{ name, email, address }]);
+                        if (error) throw error;
+                    }
 
                     await fetchDashboardData();
-                    await fetchClients(); // Update Clients section after adding a client
-                    populateClientFilter(); // Update client filter dropdown after adding a client
+                    await fetchClients(); // Update Clients section after adding/editing a client
+                    populateClientFilter(); // Update client filter dropdown after adding/editing a client
                     clientNameInput.value = '';
                     clientEmailInput.value = '';
                     clientAddressInput.value = '';
+                    clientIdInput.value = '';
                     $('#addClientModal').modal('hide');
                 } catch (error) {
-                    console.error('Failed to add client:', error);
-                    alert('An error occurred while adding the client: ' + (error.message || 'Unknown error'));
+                    console.error('Failed to add/edit client:', error);
+                    alert('An error occurred while adding/editing the client: ' + (error.message || 'Unknown error'));
                 }
             });
         }
